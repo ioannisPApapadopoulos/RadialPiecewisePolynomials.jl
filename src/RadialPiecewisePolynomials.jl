@@ -14,7 +14,7 @@ import LinearAlgebra: eigvals, eigen, isapprox, SymTridiagonal, norm, factorize
 import AlgebraicCurveOrthogonalPolynomials: factorize, ZernikeAnnulusITransform
 import LazyArrays: Vcat
 
-export SVector, Zeros, Ones,
+export SVector, Zeros, Ones, Vcat,
         ContinuousZernikeElementMode, ContinuousZernikeAnnulusElementMode, grid, plotvalues, plotannulus
 
 include("diskelement.jl")
