@@ -21,9 +21,10 @@ axes(Z::ContinuousZernikeAnnulusElementMode) = (Inclusion(annulus(first(Z.points
 
 function getindex(Z::ContinuousZernikeAnnulusElementMode{T}, xy::StaticVector{2}, j::Int)::T where {T}
     p = Z.points
-    ρ, β = convert(T, p[1]), convert(T, p[2])
+    α, β = convert(T, p[1]), convert(T, p[2])
+    ρ = α / β
     rθ = RadialCoordinate(xy)
-    r̃ = affine(ρ.. β, ρ.. 1)[rθ.r]
+    r̃ = affine(α.. β, ρ.. 1)[rθ.r]
     xỹ = SVector(r̃*cos(rθ.θ), r̃*sin(rθ.θ))
     Z.m == 0 && @assert Z.j == 1
 
@@ -55,9 +56,10 @@ function ann2element(t::T, m::Int) where T
     (L₁₁, L₀₁, L₁₀)
 end
 
-function fa_annulus(f, ρ, r, xy)
+function fa_annulus(f, α, β, xy)
+    ρ = α / β
     rθ = RadialCoordinate(xy)
-    r̃ = affine(ρ.. 1, ρ.. r)[rθ.r]
+    r̃ = affine(ρ.. 1, α.. β)[rθ.r]
     xỹ = SVector(r̃*cos(rθ.θ), r̃*sin(rθ.θ))
     f(xỹ)
 end
@@ -65,13 +67,14 @@ end
 function ldiv(C::ContinuousZernikeAnnulusElementMode{V}, f::AbstractQuasiVector) where V
     # T = promote_type(V, eltype(f))
     T = V
-    ρ, β = convert(T, first(C.points)), convert(T, last(C.points))
+    α, β = convert(T, first(C.points)), convert(T, last(C.points))
+    ρ = α / β
     m, j = C.m, C.j
     Z = ZernikeAnnulus{T}(ρ, 0, 0)
     x = axes(Z,1)
     # # Need to take into account different scalings
     if β ≉  1
-        fc(xy) = fa_annulus(f.f, ρ, β, xy)
+        fc(xy) = fa_annulus(f.f, α, β, xy)
         f̃ = fc.(x)
     else
         f̃ = f.f.(x)
@@ -97,7 +100,8 @@ end
     T = promote_type(eltype(A), eltype(B))
     @assert A' == B
 
-    ρ, β = convert(T, first(B.points)), convert(T, last(B.points))
+    α, β = convert(T, first(B.points)), convert(T, last(B.points))
+    ρ = α / β
     m, j = B.m, B.j
 
     t = inv(one(T)-ρ^2)
@@ -120,7 +124,7 @@ end
     C = [a11' a12' a'; a12' a22' b']
 
     M = [[C[1:2,3:4]'; Zeros{T}(∞,2)] M]
-    m₀*Vcat([C Zeros{T}(2,∞)], M)
+    β^2*m₀*Vcat([C Zeros{T}(2,∞)], M)
 end
 
 ###
@@ -196,12 +200,13 @@ end
 ###
 
 function grid(C::ContinuousZernikeAnnulusElementMode{T}, j::Int) where T
-    Z = ZernikeAnnulus{T}(C.points[1], 0, 0)
+    Z = ZernikeAnnulus{T}(C.points[1]/C.points[2], 0, 0)
     AlgebraicCurveOrthogonalPolynomials.grid(Z, Block(j+C.m))
 end
 
-function scalegrid(g::Matrix{RadialCoordinate{T}}, ρ::T, β::T) where T
-    rs = x -> affine(ρ.. 1, ρ.. β)[x.r]
+function scalegrid(g::Matrix{RadialCoordinate{T}}, α::T, β::T) where T
+    ρ = α / β
+    rs = x -> affine(ρ.. 1, α.. β)[x.r]
     gs = (x, r) -> RadialCoordinate(SVector(r*cos(x.θ), r*sin(x.θ)))
     r̃ = map(rs, g)
     gs.(g, r̃)
@@ -209,7 +214,8 @@ end
 
 function plotvalues(u::ApplyQuasiVector{T,typeof(*),<:Tuple{ContinuousZernikeAnnulusElementMode, AbstractVector}}) where T
     C,c = u.args
-    ρ, β = convert(T, first(C.points)), convert(T, last(C.points))
+    α, β = convert(T, first(C.points)), convert(T, last(C.points))
+    ρ = α / β
     m = C.m
 
     Z = ZernikeAnnulus{T}(ρ, 0, 0)
@@ -234,7 +240,7 @@ function plotvalues(u::ApplyQuasiVector{T,typeof(*),<:Tuple{ContinuousZernikeAnn
     N = size(f,1)
 
     # Scale the grid
-    g = scalegrid(grid(C, N), ρ, β)
+    g = scalegrid(grid(C, N), α, β)
 
     # Use fast transforms for synthesis
     FT = ZernikeAnnulusITransform{T}(N+C.m, 0, 0, 0, Z.ρ)
