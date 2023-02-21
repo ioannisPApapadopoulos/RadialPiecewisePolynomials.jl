@@ -200,17 +200,17 @@ function grid(C::ContinuousZernikeAnnulusElementMode{T}, j::Int) where T
     AlgebraicCurveOrthogonalPolynomials.grid(Z, Block(j+C.m))
 end
 
+function scalegrid(g::Matrix{RadialCoordinate{T}}, ρ::T, β::T) where T
+    rs = x -> affine(ρ.. 1, ρ.. β)[x.r]
+    gs = (x, r) -> RadialCoordinate(SVector(r*cos(x.θ), r*sin(x.θ)))
+    r̃ = map(rs, g)
+    gs.(g, r̃)
+end
+
 function plotvalues(u::ApplyQuasiVector{T,typeof(*),<:Tuple{ContinuousZernikeAnnulusElementMode, AbstractVector}}) where T
     C,c = u.args
     ρ, β = convert(T, first(C.points)), convert(T, last(C.points))
     m = C.m
-    
-    β < 1 && error("Currently can only plot if outer radius 1")
-    # First scale the grid
-    # g = grid(C, N)
-    # rθ = RadialCoordinate(xy)
-    # r̃ = affine(ρ.. β, ρ.. 1)[rθ.r]
-    # xỹ = SVector(r̃*cos(rθ.θ), r̃*sin(rθ.θ))
 
     Z = ZernikeAnnulus{T}(ρ, 0, 0)
 
@@ -231,11 +231,14 @@ function plotvalues(u::ApplyQuasiVector{T,typeof(*),<:Tuple{ContinuousZernikeAnn
     F = ModalTrav(f)
 
     # AlgebraicCurveOrthogonalPolynomials.plotvalues(Z*[F; zeros(∞)], x)
+    N = size(f,1)
+
+    # Scale the grid
+    g = scalegrid(grid(C, N), ρ, β)
 
     # Use fast transforms for synthesis
-    N = size(f,1)
     FT = ZernikeAnnulusITransform{T}(N+C.m, 0, 0, 0, Z.ρ)
-    grid(C, N), FT * pad(F,axes(Z,2))[Block.(OneTo(N+C.m))]
+    g, FT * pad(F,axes(Z,2))[Block.(OneTo(N+C.m))]
 end
 
 function plotannulus(g::Matrix{RadialCoordinate{T}}, vals::Matrix{T}) where T
