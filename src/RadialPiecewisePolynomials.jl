@@ -14,10 +14,11 @@ import LinearAlgebra: eigvals, eigen, isapprox, SymTridiagonal, norm, factorize
 import AlgebraicCurveOrthogonalPolynomials: factorize, ZernikeAnnulusITransform
 import LazyArrays: Vcat
 
-export SVector, Zeros, Ones, Vcat,
-        ContinuousZernikeElementMode, ContinuousZernikeAnnulusElementMode, grid, plotvalues, plotannulus
+export SVector, Zeros, Ones, Vcat, Derivative, pad, paddeddata, Hcat,
+        ContinuousZernikeElementMode, ContinuousZernikeAnnulusElementMode, grid, plotvalues, plotannulus,
+        ContinuousZernikeAnnulusMode
 
 include("diskelement.jl")
 include("annuluselement.jl")
-
+include("annulus.jl")
 end # module

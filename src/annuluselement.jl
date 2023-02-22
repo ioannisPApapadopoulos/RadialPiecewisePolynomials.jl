@@ -1,3 +1,12 @@
+"""
+ContinuousZernikeAnnulusElementMode{T, P<:AbstractVector, M<:Int, J<:Int}
+
+is a quasi-vector representing the hat + bubble (m,j)-mode ZernikeAnnulus on a scaled annulus.
+
+The points [α,β] defines the inner and outer radii
+m is the Forier mode, j = 0 corresponds to sin, j = 1 corresponds to cos. 
+"""
+
 annulus(ρ::T, r::T) where T = (r*UnitDisk{T}()) \ (ρ*UnitDisk{T}())
 # ClassicalOrthogonalPolynomials.checkpoints(d::DomainSets.SetdiffDomain{SVector{2, T}, Tuple{DomainSets.EuclideanUnitBall{2, T, :closed}, DomainSets.GenericBall{SVector{2, T}, :closed, T}}}) where T = [SVector{2,T}(cos(0.1),sin(0.1)), SVector{2,T}(cos(0.2),sin(0.2))]
 
@@ -42,7 +51,7 @@ end
 # Transforms
 ###
 
-function ann2element(t::T, m::Int) where T
+function _ann2element(t::T, m::Int) where T
 
     Q₀₀ = SemiclassicalJacobi{T}(t, 0, 0, m)
     Q₀₁ = SemiclassicalJacobi{T}(t, 0, 1, m)
@@ -56,7 +65,7 @@ function ann2element(t::T, m::Int) where T
     (L₁₁, L₀₁, L₁₀)
 end
 
-function fa_annulus(f, α, β, xy)
+function _scale_fcn(f, α::T, β::T, xy::AbstractArray) where T
     ρ = α / β
     rθ = RadialCoordinate(xy)
     r̃ = affine(ρ.. 1, α.. β)[rθ.r]
@@ -74,17 +83,18 @@ function ldiv(C::ContinuousZernikeAnnulusElementMode{V}, f::AbstractQuasiVector)
     x = axes(Z,1)
     # # Need to take into account different scalings
     if β ≉  1
-        fc(xy) = fa_annulus(f.f, α, β, xy)
+        fc(xy) = _scale_fcn(f.f, α, β, xy)
         f̃ = fc.(x)
     else
         f̃ = f.f.(x)
     end
-    c = Z\f̃ # ZernikeAnnulus transform
+    c = pad(Z[:, Block.(1:200)]\f̃, axes(Z,2)) # ZernikeAnnulus transform
+    # c = Z\f̃ # ZernikeAnnulus transform
     c̃ = ModalTrav(paddeddata(c))
     N = size(c̃.matrix, 1) # degree
     
     t = inv(one(T)-ρ^2)
-    (L₁₁, L₀₁, L₁₀) = ann2element(t, m)
+    (L₁₁, L₀₁, L₁₀) = _ann2element(t, m)
     R̃ = [L₁₀[:,1] L₀₁[:,1] L₁₁]
 
     # convert from ZernikeAnnulus(ρ,0,0) to hats + Bubble
@@ -105,7 +115,7 @@ end
     m, j = B.m, B.j
 
     t = inv(one(T)-ρ^2)
-    (L₁₁, L₀₁, L₁₀) = ann2element(t, m)
+    (L₁₁, L₀₁, L₁₀) = _ann2element(t, m)
 
     # Contribution from the mass matrix <R_m,j^(ρ,0,0,0),R_m,j^(ρ,0,0,0)>_L^2
     jw = sum(SemiclassicalJacobiWeight{T}(t,0,0,m))
@@ -130,6 +140,17 @@ end
 ###
 # Gradient and L2 inner product of gradient
 ##
+
+"""
+GradienContinuousZernikeAnnulusElementMode{T, P<:AbstractVector, M<:Int, J<:Int}
+
+is a quasi-vector representing the gradient of ContinuousZernikeAnnulusElementMode.
+
+The points, m, and j are the same as for ContinuousZernikeAnnulusElementMode. This is
+effectively a placeholder for the actual implementation of the gradient of ZernikeAnnulus.
+For now we use it as a intermediate to compute the weak Laplacian matrix. 
+"""
+
 struct GradientContinuousZernikeAnnulusElementMode{T, P<:AbstractVector, M<:Int, J<:Int}<:Basis{T}
     points::P
     m::M
@@ -155,40 +176,42 @@ end
 
 # <∇ W^(0,1)_m,m,j, ∇ W^(0,1)_m,m,j>
 function W010(m::Int, ρ::T) where T 
-    (convert(T,π)*(T(2) - ρ^(2m)*(m*(T(2) + m) - 2m*(T(2) + m)*ρ^(T(2)) + (T(2) + m*(T(2) + m))*ρ^(T(4)) )))/(T(2) + m)
+    (convert(T,π)*(T(2) - ρ^(2m)*(m*(2 + m) - 2m*(2 + m)*ρ^2 + (2 + m*(2 + m))*ρ^4 )))/(2 + m)
 end
 
 # <∇ W^(1,0)_m,m,j, ∇ W^(1,0)_m,m,j>
 function W100(m::Int, ρ::T) where T
-    (convert(T,π)*(T(2) - T(2)*ρ^(T(4) + 2m) + m*(T(2) + m)*(-one(T) + ρ^(T(2)))^(T(2))))/(T(2) + m)   
+    (convert(T,π)*(T(2) - 2*ρ^(4 + 2m) + m*(2 + m)*(-one(T) + ρ^2)^2))/(2 + m)   
 end
 
 # <∇ W^(1,0)_m,m,j, ∇ W^(0,1)_m,m,j>
 function W_100_010(m::Int, ρ::T) where T
-    (T(2)*convert(T,π)*(-one(T) + ρ^(T(4) + 2m)))/(T(2) + m)
+    (2*convert(T,π)*(-one(T) + ρ^(4 + 2m)))/(2 + m)
 end
 
 @simplify function *(A::QuasiAdjoint{<:Any,<:GradientContinuousZernikeAnnulusElementMode}, B::GradientContinuousZernikeAnnulusElementMode)
     T = promote_type(eltype(A), eltype(B))
-    ρ, β = convert(T, first(B.points)), convert(T, last(B.points))
+    α, β = convert(T, first(B.points)), convert(T, last(B.points))
+    ρ = α / β
     m = B.m
-    # Scaling if outer radius is β instead of 1.
-    s = inv(( (one(T)- ρ) / (β - ρ) )^2)
+    # # Scaling if outer radius is β instead of 1.
+    # s = inv(( (one(T)- ρ) / (β - ρ) )^2)
+    
     # Contribution from the normalisation <w R_m,j^(ρ,1,1,0),R_m,j^(ρ,1,1,0)>_L^2
     t = inv(one(T)-ρ^2)
     jw = sum(SemiclassicalJacobiWeight{T}(t,1,1,m))
-    m₀ = convert(T,π) / ( t^(T(3) + m) ) * jw
+    m₀ = convert(T,π) / ( t^(3 + m) ) * jw
     m₀ = m == 0 ? m₀ : m₀ / T(2)
     
     Z = ZernikeAnnulus{T}(ρ,1,1)
     D = Z \ (Laplacian(axes(Z,1))*Weighted(Z))
 
-    Δ = -s * m₀ * D.ops[m+1]
+    Δ = - m₀ * D.ops[m+1]
     if m == 0
         c = convert(T,2π)*(T(1) - ρ^4)
-        C = [c -c 4s*m₀*(m+1); -c c -4s*m₀*(m+1)]
+        C = [c -c 4*m₀*(m+1); -c c -4*m₀*(m+1)]
     else
-        C = [W010(m, ρ) W_100_010(m, ρ) 4s*m₀*(m+1); W_100_010(m, ρ) W100(m,ρ) -4s*m₀*(m+1)]
+        C = [W010(m, ρ) W_100_010(m, ρ) 4*m₀*(m+1); W_100_010(m, ρ) W100(m,ρ) -4*m₀*(m+1)]
     end
 
     Δ = [[C[1:2,3]'; Zeros{T}(∞,2)] Δ]
@@ -221,7 +244,7 @@ function plotvalues(u::ApplyQuasiVector{T,typeof(*),<:Tuple{ContinuousZernikeAnn
     Z = ZernikeAnnulus{T}(ρ, 0, 0)
 
     t = inv(one(T)-ρ^2)
-    (L₁₁, L₀₁, L₁₀) = ann2element(t, m)
+    (L₁₁, L₀₁, L₁₀) = _ann2element(t, m)
     R̃ = [L₁₀[:,1] L₀₁[:,1] L₁₁]
  
     c = paddeddata(c)
