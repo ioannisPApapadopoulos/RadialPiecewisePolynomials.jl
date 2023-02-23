@@ -88,17 +88,22 @@ function ldiv(C::ContinuousZernikeAnnulusElementMode{V}, f::AbstractQuasiVector)
     else
         f̃ = f.f.(x)
     end
-    c = pad(Z[:, Block.(1:200)]\f̃, axes(Z,2)) # ZernikeAnnulus transform
+
+    # FIXME! Temporary hack to do with truncation and adaptive ldiv.
     # c = Z\f̃ # ZernikeAnnulus transform
+    c = pad(Z[:, Block.(1:200)]\f̃, axes(Z,2)) # ZernikeAnnulus transform
     c̃ = ModalTrav(paddeddata(c))
-    N = size(c̃.matrix, 1) # degree
+    c̃ = c̃.matrix[:, 2*C.m + C.j]
+    # Truncate machine error tail
+    c̃ = c̃[1:findall(x->abs(x) > 2*eps(T), c̃)[end]]
+    N = length(c̃) # degree
     
     t = inv(one(T)-ρ^2)
     (L₁₁, L₀₁, L₁₀) = _ann2element(t, m)
     R̃ = [L₁₀[:,1] L₀₁[:,1] L₁₁]
 
     # convert from ZernikeAnnulus(ρ,0,0) to hats + Bubble
-    dat = R̃[1:N,1:N] \ c̃.matrix[:, 2*C.m + C.j]
+    dat = R̃[1:N,1:N] \ c̃
     cfs = T[]
     pad(append!(cfs, dat), axes(C,2))
 end

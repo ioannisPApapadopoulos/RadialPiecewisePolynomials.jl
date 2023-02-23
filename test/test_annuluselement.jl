@@ -65,7 +65,7 @@ import MultivariateOrthogonalPolynomials: ModalTrav
     @testset "mass matrix" begin
         # Test m = 0
         ρ = 0.2
-        f0(x) = exp(-first(xy)^2-last(xy)^2)
+        f0(xy) = exp(-first(xy)^2-last(xy)^2)
         C = ContinuousZernikeAnnulusElementMode([ρ; 1], 0, 1)
         xy = axes(C,1)
         fc = C \ f0.(xy)
@@ -103,7 +103,8 @@ import MultivariateOrthogonalPolynomials: ModalTrav
         fc = C \ rhs0.(xy)
         ∇ = Derivative(xy); Δ = (∇*C)' * (∇*C)
         # ∫_0^2π ∫_ρ^1 |∇ exp(-r^2)|^2 r dr dθ.  
-        N = 100; fc[1:N]' * Δ[1:N,1:N] * fc[1:N] ≈ 1.856554980031349
+        N = 100; 
+        @test fc[1:N]' * Δ[1:N,1:N] * fc[1:N] ≈ 1.856554980031349
 
         # Test m = 1
         function rhs1(xy)
@@ -117,7 +118,8 @@ import MultivariateOrthogonalPolynomials: ModalTrav
         fc = C \ rhs1.(xy)
         ∇ = Derivative(xy); Δ = (∇*C)' * (∇*C)
         # ∫_0^2π ∫_ρ^1 |∇ exp(-r^2) r sin(θ)|^2 r dr dθ.
-        N = 100; fc[1:N]' * Δ[1:N,1:N] * fc[1:N] ≈ 0.816915357578546
+        N = 100; 
+        @test fc[1:N]' * Δ[1:N,1:N] * fc[1:N] ≈ 0.816915357578546
 
         # Test m = 6
         function rhs6(xy)
