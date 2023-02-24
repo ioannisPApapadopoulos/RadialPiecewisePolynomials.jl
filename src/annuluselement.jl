@@ -95,7 +95,7 @@ function ldiv(C::ContinuousZernikeAnnulusElementMode{V}, f::AbstractQuasiVector)
     c̃ = ModalTrav(paddeddata(c))
     c̃ = c̃.matrix[:, 2*C.m + C.j]
     # Truncate machine error tail
-    c̃ = c̃[1:findall(x->abs(x) > 2*eps(T), c̃)[end]]
+    c̃ = c̃[1:findall(x->abs(x) > 2*eps(T), c̃)[end]+5]
     N = length(c̃) # degree
     
     t = inv(one(T)-ρ^2)
