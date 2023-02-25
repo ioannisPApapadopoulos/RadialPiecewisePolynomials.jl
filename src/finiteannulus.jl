@@ -150,5 +150,5 @@ function element_plotvalues(u::ApplyQuasiVector{T,typeof(*),<:Tuple{FiniteContin
         append!(θs,[θ]); append!(rs, [r]); append!(valss, [vals])
     end
     
-    return (θs, rs, valss)
+    return (uc, θs, rs, valss)
 end

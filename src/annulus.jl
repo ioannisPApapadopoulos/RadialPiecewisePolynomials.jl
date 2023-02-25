@@ -17,9 +17,9 @@ axes(Z::ContinuousZernikeAnnulusMode) = (Inclusion(annulus(first(Z.points), last
 ==(P::ContinuousZernikeAnnulusMode, Q::ContinuousZernikeAnnulusMode) = P.points == Q.points && P.m == Q.m && P.j == Q.j
 
 function getindex(C::ContinuousZernikeAnnulusMode{T}, xy::StaticVector{2}, j::Int)::T where {T}
-    n = length(C.points)
-    b = ((j-1) % (n-1)) + 1
-    i = (j + n-2) ÷ (n-1)
+    K = length(C.points) - 1
+    b = ((j-1) % K) + 1
+    i = (j + K-1) ÷ K
     
     # FIXME: I need to combine the hat functions
     if b == searchsortedlast(C.points, RadialCoordinate(xy).r)
