@@ -47,25 +47,25 @@ end
     Cs = _getCs(points, m, j)
 
     Ms = [C' * C for C in Cs]
-
-    # γs = [fs[i][2] / fs[i+1][1] for i in 1:K-1]
-    γs = [(one(T)-(points[k+1]/points[k+2])^2) / (one(T)-(points[k]/points[k+1])^2) for k in 1:K-1]
     M = Hcat(Matrix(Ms[1][1:N, 1:N]), zeros(N,(K-1)*(N-1)))
-
-    for k in 2:K
-        M = Matrix(Vcat(M, Hcat(zeros(N-1, N+(k-2)*(N-1)), Ms[k][2:N, 2:N], zeros(N-1, (K-k)*(N-1)))))
-    end
-
-    M[2, 2] = M[2,2] + Ms[2][1,1] / γs[1]^2
-    M[2, N+1:N+3] = Ms[2][1,2:4] / γs[1]
-    M[N+1:N+3,2] = Ms[2][2:4,1] / γs[1]
-
-    for k in 2:K-1
-        M[N+(k-2)*(N-1)+1, N+(k-2)*(N-1)+1] += Ms[k+1][1,1] / γs[k]^2
-        M[N+(k-2)*(N-1)+1, N+(k-1)*(N-1)+1:N+(k-1)*(N-1)+3] = Ms[k+1][1,2:4] / γs[k]
-        M[N+(k-1)*(N-1)+1:N+(k-1)*(N-1)+3, N+(k-2)*(N-1)+1] = Ms[k+1][2:4,1] / γs[k]
-    end
     
+    if K > 1
+        # γs = [fs[i][2] / fs[i+1][1] for i in 1:K-1]
+        γs = [(one(T)-(points[k+1]/points[k+2])^2)*(points[k+1]/points[k+2])^m / (one(T)-(points[k]/points[k+1])^2) for k in 1:K-1]
+        for k in 2:K
+            M = Matrix(Vcat(M, Hcat(zeros(N-1, N+(k-2)*(N-1)), Ms[k][2:N, 2:N], zeros(N-1, (K-k)*(N-1)))))
+        end
+
+        M[2, 2] = M[2,2] + Ms[2][1,1] / γs[1]^2
+        M[2, N+1:N+3] = Ms[2][1,2:4] / γs[1]
+        M[N+1:N+3,2] = Ms[2][2:4,1] / γs[1]
+
+        for k in 2:K-1
+            M[N+(k-2)*(N-1)+1, N+(k-2)*(N-1)+1] += Ms[k+1][1,1] / γs[k]^2
+            M[N+(k-2)*(N-1)+1, N+(k-1)*(N-1)+1:N+(k-1)*(N-1)+3] = Ms[k+1][1,2:4] / γs[k]
+            M[N+(k-1)*(N-1)+1:N+(k-1)*(N-1)+3, N+(k-2)*(N-1)+1] = Ms[k+1][2:4,1] / γs[k]
+        end
+    end
     return M
 end
 
@@ -102,27 +102,30 @@ end
     Ds = [Derivative(x) for x in xs]
     Δs = [(D*C)' * (D*C) for (C, D) in zip(Cs, Ds)]
 
-    γs = [(one(T)-(points[k+1]/points[k+2])^2) / (one(T)-(points[k]/points[k+1])^2) for k in 1:K-1]
+
     Δ = Hcat(Matrix(Δs[1][1:N, 1:N]), zeros(N,(K-1)*(N-1)))
-    for k in 2:K
-        Δ = Matrix(Vcat(Δ, Hcat(zeros(N-1, N+(k-2)*(N-1)), Δs[k][2:N, 2:N], zeros(N-1, (K-k)*(N-1)))))
-    end
+    if K > 1
+        γs = [(one(T)-(points[k+1]/points[k+2])^2)*(points[k+1]/points[k+2])^m / (one(T)-(points[k]/points[k+1])^2) for k in 1:K-1]
+        for k in 2:K
+            Δ = Matrix(Vcat(Δ, Hcat(zeros(N-1, N+(k-2)*(N-1)), Δs[k][2:N, 2:N], zeros(N-1, (K-k)*(N-1)))))
+        end
 
-    Δ[2, 2] = Δ[2,2] + Δs[2][1,1] / γs[1]^2
-    Δ[2, N+1:N+3] = Δs[2][1,2:4] / γs[1]
-    Δ[N+1:N+3,2] = Δs[2][2:4,1] / γs[1]
+        Δ[2, 2] = Δ[2,2] + Δs[2][1,1] / γs[1]^2
+        Δ[2, N+1:N+3] = Δs[2][1,2:4] / γs[1]
+        Δ[N+1:N+3,2] = Δs[2][2:4,1] / γs[1]
 
-    for k in 2:K-1  
-        Δ[N+(k-2)*(N-1)+1, N+(k-2)*(N-1)+1] += Δs[k+1][1,1] / γs[k]^2
-        Δ[N+(k-2)*(N-1)+1,N+(k-1)*(N-1)+1:N+(k-1)*(N-1)+3] = Δs[k+1][1,2:4] / γs[k]
-        Δ[N+(k-1)*(N-1)+1:N+(k-1)*(N-1)+3, N+(k-2)*(N-1)+1] = Δs[k+1][2:4,1] / γs[k]
+        for k in 2:K-1  
+            Δ[N+(k-2)*(N-1)+1, N+(k-2)*(N-1)+1] += Δs[k+1][1,1] / γs[k]^2
+            Δ[N+(k-2)*(N-1)+1,N+(k-1)*(N-1)+1:N+(k-1)*(N-1)+3] = Δs[k+1][1,2:4] / γs[k]
+            Δ[N+(k-1)*(N-1)+1:N+(k-1)*(N-1)+3, N+(k-2)*(N-1)+1] = Δs[k+1][2:4,1] / γs[k]
+        end
     end
 
     return Δ
 end
 
-function zero_dirichlet_bcs!(C::FiniteContinuousZernikeAnnulusMode{T}, Δ::AbstractMatrix{T}, Mf::AbstractVector{T}) where T
-    N = C.N; K = length(C.points)-1
+function zero_dirichlet_bcs!(F::FiniteContinuousZernikeAnnulusMode{T}, Δ::AbstractMatrix{T}, Mf::AbstractVector{T}) where T
+    N = F.N; K = length(F.points)-1
     Δ[:,1].=0; Δ[1,:].=0; Δ[1,1]=1.; 
     Δ[N+(K-2)*(N-1)+1,:].=0; Δ[:,N+(K-2)*(N-1)+1].=0; Δ[N+(K-2)*(N-1)+1,N+(K-2)*(N-1)+1]=1.;
     Mf[1]=0; Mf[N+(K-2)*(N-1)+1]=0;
@@ -138,7 +141,7 @@ function element_plotvalues(u::ApplyQuasiVector{T,typeof(*),<:Tuple{FiniteContin
     N = C.N; m = C.m; j = C.j
     Cs = _getCs(points, m, j)
 
-    γs = [(one(T)-(points[k+1]/points[k+2])^2) / (one(T)-(points[k]/points[k+1])^2) for k in 1:K-1]
+    γs = [(one(T)-(points[k+1]/points[k+2])^2)*(points[k+1]/points[k+2])^m / (one(T)-(points[k]/points[k+1])^2) for k in 1:K-1]
 
     uc = [pad(u[1:N], axes(Cs[1],2))]
     for k = 2:K append!(uc, [pad([uc[k-1][2]/γs[k-1]; u[N+(k-2)*(N-1)+1:N+(k-1)*(N-1)]], axes(Cs[k],2))]) end

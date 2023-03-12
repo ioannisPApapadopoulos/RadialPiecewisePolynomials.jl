@@ -121,7 +121,7 @@ end
     D = Z \ (Laplacian(axes(Z,1))*Weighted(Z))
 
     Δ = -inv(β^2)*D.ops[B.m+1]
-    cₘ = inv(β^2)*π*B.m*zerniker(B.m,B.m,0,1,1.)^2 # = <Z^(0,1)_{m,m,j}, Z^(0,1)_{m,m,j}>_L^2
+    cₘ = inv(β^2)*π*B.m*zerniker(B.m,B.m,0,1,one(T))^2 # = <Z^(0,1)_{m,m,j}, Z^(0,1)_{m,m,j}>_L^2
 
     Vcat([T[cₘ]; Zeros{T}(∞)]', [Zeros{T}(∞) Δ])
 end
