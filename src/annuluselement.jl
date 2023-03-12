@@ -73,6 +73,14 @@ function _scale_fcn(f, α::T, β::T, xy::AbstractArray) where T
     f(xỹ)
 end
 
+# Use memoize to cache the Zernike annulus expansion. This will avoid the analysis for the same function being run
+# many times when considering problems with multiple modes.
+@memoize Dict function _zernikeannulus_ldiv(Z::ZernikeAnnulus{T}, f̃::QuasiArrays.BroadcastQuasiVector, f::AbstractMatrix) where T
+    # FIXME! Temporary hack to do with truncation and adaptive ldiv.
+    # c = Z\f̃ # ZernikeAnnulus transform
+    pad(Z[:, Block.(1:200)]\f̃, axes(Z,2))
+end
+
 function ldiv(C::ContinuousZernikeAnnulusElementMode{V}, f::AbstractQuasiVector) where V
     # T = promote_type(V, eltype(f))
     T = V
@@ -89,13 +97,12 @@ function ldiv(C::ContinuousZernikeAnnulusElementMode{V}, f::AbstractQuasiVector)
         f̃ = f.f.(x)
     end
 
-    # FIXME! Temporary hack to do with truncation and adaptive ldiv.
-    # c = Z\f̃ # ZernikeAnnulus transform
-    c = pad(Z[:, Block.(1:200)]\f̃, axes(Z,2)) # ZernikeAnnulus transform
+    c = _zernikeannulus_ldiv(Z, f̃, f̃.f.(AlgebraicCurveOrthogonalPolynomials.grid(Z,20))) # ZernikeAnnulus transform
     c̃ = ModalTrav(paddeddata(c))
     c̃ = c̃.matrix[:, 2*C.m + C.j]
     # Truncate machine error tail
-    c̃ = c̃[1:findall(x->abs(x) > 2*eps(T), c̃)[end]+5]
+    Ñ = findall(x->abs(x) > 2*eps(T), c̃)
+    c̃ = isempty(Ñ) ? c̃[1:3] : c̃[1:Ñ[end]+5]
     N = length(c̃) # degree
     
     t = inv(one(T)-ρ^2)

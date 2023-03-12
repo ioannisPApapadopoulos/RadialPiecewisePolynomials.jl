@@ -2,7 +2,7 @@ module RadialPiecewisePolynomials
 
 using AlgebraicCurveOrthogonalPolynomials, ClassicalOrthogonalPolynomials, ContinuumArrays, DomainSets,
     FastTransforms, ForwardDiff, LinearAlgebra, MultivariateOrthogonalPolynomials, SemiclassicalOrthogonalPolynomials,
-    StaticArrays, QuasiArrays, FillArrays, LazyArrays#, ArrayLayouts#, LazyBandedMatrices#, 
+    StaticArrays, QuasiArrays, FillArrays, LazyArrays, Memoization#, ArrayLayouts#, LazyBandedMatrices#, 
 
 
 import ContinuumArrays: Weight, grid, ℵ₁, ℵ₀, @simplify, ProjectionFactorization, plan_grid_transform, unweighted, weight
