@@ -17,10 +17,12 @@ import LazyArrays: Vcat
 export SVector, Zeros, Ones, Vcat, Derivative, pad, paddeddata, Hcat,
         ContinuousZernikeElementMode, ContinuousZernikeAnnulusElementMode, grid, plotvalues, plotannulus,
         ContinuousZernikeAnnulusMode,
-        FiniteContinuousZernikeAnnulusMode, zero_dirichlet_bcs!, element_plotvalues
+        FiniteContinuousZernikeAnnulusMode, zero_dirichlet_bcs!, element_plotvalues,
+        FiniteContinuousZernikeAnnulus
 
 include("diskelement.jl")
 include("annuluselement.jl")
+include("finiteannulusmode.jl")
 include("finiteannulus.jl")
 include("annulus.jl")
 end # module

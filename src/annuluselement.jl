@@ -10,20 +10,23 @@ m is the Forier mode, j = 0 corresponds to sin, j = 1 corresponds to cos.
 annulus(ρ::T, r::T) where T = (r*UnitDisk{T}()) \ (ρ*UnitDisk{T}())
 # ClassicalOrthogonalPolynomials.checkpoints(d::DomainSets.SetdiffDomain{SVector{2, T}, Tuple{DomainSets.EuclideanUnitBall{2, T, :closed}, DomainSets.GenericBall{SVector{2, T}, :closed, T}}}) where T = [SVector{2,T}(cos(0.1),sin(0.1)), SVector{2,T}(cos(0.2),sin(0.2))]
 
-struct ContinuousZernikeAnnulusElementMode{T, P<:AbstractVector, M<:Int, J<:Int} <: Basis{T}
+struct ContinuousZernikeAnnulusElementMode{T, P<:AbstractVector, M<:Int, J<:Int, B<:Int} <: Basis{T}
     points::P
     m::M
     j::J
+    b::B # Should remove once adaptive expansion has been figured out.
 end
 
-function ContinuousZernikeAnnulusElementMode{T}(points::AbstractVector, m::Int, j::Int) where {T}
+function ContinuousZernikeAnnulusElementMode{T}(points::AbstractVector, m::Int, j::Int, b::Int) where {T}
     @assert length(points) == 2 && zero(T) < points[1] < points[2] ≤ one(T)
     @assert m ≥ 0
     @assert m == 0 ? j == 1 : 0 ≤ j ≤ 1
-    ContinuousZernikeAnnulusElementMode{T,typeof(points), Int, Int}(points, m, j)
+    # @assert b ≥ m
+    ContinuousZernikeAnnulusElementMode{T,typeof(points), Int, Int, Int}(points, m, j, b)
 end
 
-ContinuousZernikeAnnulusElementMode(points::AbstractVector, m::Int, j::Int) = ContinuousZernikeAnnulusElementMode{Float64}(points, m, j)
+ContinuousZernikeAnnulusElementMode(points::AbstractVector, m::Int, j::Int, b::Int) = ContinuousZernikeAnnulusElementMode{Float64}(points, m, j, b)
+ContinuousZernikeAnnulusElementMode(points::AbstractVector, m::Int, j::Int) = ContinuousZernikeAnnulusElementMode(points, m, j, 200)
 
 axes(Z::ContinuousZernikeAnnulusElementMode) = (Inclusion(annulus(first(Z.points), last(Z.points))), oneto(∞))
 ==(P::ContinuousZernikeAnnulusElementMode, Q::ContinuousZernikeAnnulusElementMode) = P.points == Q.points && P.m == Q.m && P.j == Q.j
@@ -75,10 +78,10 @@ end
 
 # Use memoize to cache the Zernike annulus expansion. This will avoid the analysis for the same function being run
 # many times when considering problems with multiple modes.
-@memoize Dict function _zernikeannulus_ldiv(Z::ZernikeAnnulus{T}, f̃::QuasiArrays.BroadcastQuasiVector, f::AbstractMatrix) where T
+@memoize Dict function _zernikeannulus_ldiv(Z::ZernikeAnnulus{T}, f̃::QuasiArrays.BroadcastQuasiVector, f::AbstractMatrix, b::Int) where T
     # FIXME! Temporary hack to do with truncation and adaptive ldiv.
     # c = Z\f̃ # ZernikeAnnulus transform
-    pad(Z[:, Block.(1:200)]\f̃, axes(Z,2))
+    pad(Z[:, Block.(1:b)]\f̃, axes(Z,2))
 end
 
 function ldiv(C::ContinuousZernikeAnnulusElementMode{V}, f::AbstractQuasiVector) where V
@@ -97,12 +100,12 @@ function ldiv(C::ContinuousZernikeAnnulusElementMode{V}, f::AbstractQuasiVector)
         f̃ = f.f.(x)
     end
 
-    c = _zernikeannulus_ldiv(Z, f̃, f̃.f.(AlgebraicCurveOrthogonalPolynomials.grid(Z,20))) # ZernikeAnnulus transform
+    c = _zernikeannulus_ldiv(Z, f̃, f̃.f.(AlgebraicCurveOrthogonalPolynomials.grid(Z,20)), C.b) # ZernikeAnnulus transform
     c̃ = ModalTrav(paddeddata(c))
     c̃ = c̃.matrix[:, 2*C.m + C.j]
     # Truncate machine error tail
     Ñ = findall(x->abs(x) > 2*eps(T), c̃)
-    c̃ = isempty(Ñ) ? c̃[1:3] : c̃[1:Ñ[end]+5]
+    c̃ = isempty(Ñ) ? c̃[1:3] : c̃[1:Ñ[end]+min(5, length(c̃)-Ñ[end])]
     N = length(c̃) # degree
     
     t = inv(one(T)-ρ^2)
@@ -247,6 +250,17 @@ function scalegrid(g::Matrix{RadialCoordinate{T}}, α::T, β::T) where T
     gs.(g, r̃)
 end
 
+function bubble2ann(α::T, β::T, m::Int, c::AbstractVector{T}) where T
+    ρ = α / β
+    t = inv(one(T)-ρ^2)
+    (L₁₁, L₀₁, L₁₀) = _ann2element(t, m)
+    R̃ = [L₁₀[:,1] L₀₁[:,1] L₁₁]
+    if c isa LazyArray
+        c = paddeddata(c)
+    end
+    R̃[1:length(c), 1:length(c)] * c # coefficients for ZernikeAnnulus(ρ,0,0)
+end
+
 function plotvalues(u::ApplyQuasiVector{T,typeof(*),<:Tuple{ContinuousZernikeAnnulusElementMode, AbstractVector}}) where T
     C,c = u.args
     α, β = convert(T, first(C.points)), convert(T, last(C.points))
@@ -255,15 +269,10 @@ function plotvalues(u::ApplyQuasiVector{T,typeof(*),<:Tuple{ContinuousZernikeAnn
 
     Z = ZernikeAnnulus{T}(ρ, 0, 0)
 
-    t = inv(one(T)-ρ^2)
-    (L₁₁, L₀₁, L₁₀) = _ann2element(t, m)
-    R̃ = [L₁₀[:,1] L₀₁[:,1] L₁₁]
- 
-    c = paddeddata(c)
-    c̃ = R̃[1:length(c), 1:length(c)] * c # coefficients for ZernikeAnnulus(ρ,0,0)
+    c̃ = bubble2ann(α, β, m, c)
     
     # Massage coeffcients into ModalTrav form.
-    N =  (isqrt(8*sum(1:2*length(c̃))+1)-1) ÷ 2
+    N = (isqrt(8*sum(1:2*length(c̃)+C.m-1)+1)-1) ÷ 2
     m = N ÷ 2 + 1
     n = 4(m-1) + 1
 
