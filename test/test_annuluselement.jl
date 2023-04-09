@@ -71,7 +71,8 @@ import MultivariateOrthogonalPolynomials: ModalTrav
         fc = C \ f0.(xy)
         M = C' * C 
         # ∫_0^2π ∫_ρ^1 exp(-r^2)^2 r dr dθ.  
-        N = 100; fc[1:N]' * M[1:N,1:N] * fc[1:N] ≈  π/2 * (exp(-2*0.2^2) - exp(-2))
+        N = 100
+        @test fc[1:N]' * M[1:N,1:N] * fc[1:N] ≈  π/2 * (exp(-2*0.2^2) - exp(-2))
 
         # Test m = 1
         f1(xy) = exp(-first(xy)^2-last(xy)^2) * sqrt(first(xy)^2+last(xy)^2)*sin(atan(last(xy), first(xy)))
@@ -79,7 +80,8 @@ import MultivariateOrthogonalPolynomials: ModalTrav
         fc = C \ f1.(xy)
         M = C' * C
         # ∫_0^2π ∫_ρ^1 exp(-r^2)^2 r^2 sin(θ)^2 r dr dθ.  
-        N = 100; fc[1:N]' * M[1:N,1:N] * fc[1:N] ≈ 0.2320693725039186
+        N = 100
+        @test fc[1:N]' * M[1:N,1:N] * fc[1:N] ≈ 0.2320693725039186
 
         # Test m = 6
         f6(xy) = exp(-first(xy)^2-last(xy)^2) * sqrt(first(xy)^2+last(xy)^2)^6*cos(6*atan(last(xy), first(xy)))
@@ -87,7 +89,8 @@ import MultivariateOrthogonalPolynomials: ModalTrav
         fc = C \ f6.(xy)
         M = C' * C
         # ∫_0^2π ∫_ρ^1 exp(-r^2)^2 r^12 cos(6θ)^2 r dr dθ.  
-        N = 100; fc[1:N]' * M[1:N,1:N] * fc[1:N] ≈ 0.04005947846778158
+        N = 100
+        @test fc[1:N]' * M[1:N,1:N] * fc[1:N] ≈ 0.04005947846778158
     end
 
     @testset "differentiation matrix" begin
@@ -133,7 +136,8 @@ import MultivariateOrthogonalPolynomials: ModalTrav
         fc = C \ rhs6.(xy)
         ∇ = Derivative(xy); Δ = (∇*C)' * (∇*C)
         # ∫_0^2π ∫_ρ^1 |∇ exp(-r^2) r sin(θ)|^2 r dr dθ.
-        N = 100; fc[1:N]' * Δ[1:N,1:N] * fc[1:N] ≈ 2.686674285690333
+        N = 100; 
+        @test fc[1:N]' * Δ[1:N,1:N] * fc[1:N] ≈ 2.686674285690333
     end
 
     @testset "transform scaling" begin
