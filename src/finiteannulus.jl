@@ -33,26 +33,39 @@ end
 # Plotting
 ##
 
-function finite_plotvalues(F::FiniteContinuousZernikeAnnulus{T}, u::AbstractVector) where T
-    points = T.(F.points); N = C.N; K = length(points)-1
+function finite_plotvalues(F::FiniteContinuousZernikeAnnulus{T}, us::AbstractVector) where T
+    points = T.(F.points); N = F.N; K = length(points)-1
     # Fs = _getFs(N, points)
 
-    # (uc, θs, rs, valss)
-    γs = zeros(K-1, N)
-    for k in 1:K-1
-        for m in 1:N
-            γs[k, m] = (one(T)-(points[k+1]/points[k+2])^2)*(points[k+1]/points[k+2])^m / (one(T)-(points[k]/points[k+1])^2)
-        end
-    end
+    # # (uc, θs, rs, valss)
+    # γs = zeros(K-1, N)
+    # for k in 1:K-1
+    #     for m in 1:N
+    #         γs[k, m] = (one(T)-(points[k+1]/points[k+2])^2)*(points[k+1]/points[k+2])^m / (one(T)-(points[k]/points[k+1])^2)
+    #     end
+    # end
 
+    # # for k in 1:K
+
+    # θs=[]; rs=[]; valss=[];
     # for k in 1:K
-
-    θs=[]; rs=[]; valss=[];
-    for k in 1:K
-        (x, vals) = plotvalues(Cs[k]*uc[k])
-        (θ, r, vals) =  plotannulus(x, vals)
-        append!(θs,[θ]); append!(rs, [r]); append!(valss, [vals])
-    end
+    #     (x, vals) = plotvalues(Cs[k]*uc[k])
+    #     (θ, r, vals) =  plotannulus(x, vals)
+    #     append!(θs,[θ]); append!(rs, [r]); append!(valss, [vals])
+    # end
     
-    return (uc, θs, rs, valss)
+    # return (uc, θs, rs, valss)
+    points = T.(F.points); N = F.N; K = length(points)-1
+    # Fs = _getFs(N, po
+    Fs = _getFs(N, points)
+    m_vals = []
+    θs = []
+    rs = []
+    for i in 1:lastindex(us)
+        (_, θ, r, vals) = element_plotvalues(Fs[i]*us[i])
+        append!(m_vals, [vals])
+        append!(θs, [θ])
+        append!(rs, [r])
+    end 
+    return (θs, rs, m_vals)
 end
