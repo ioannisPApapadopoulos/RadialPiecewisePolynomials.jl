@@ -18,7 +18,7 @@ export SVector, Zeros, Ones, Vcat, Derivative, pad, paddeddata, Hcat,
         ContinuousZernikeElementMode, ContinuousZernikeAnnulusElementMode, grid, plotvalues, plotannulus,
         ContinuousZernikeAnnulusMode,
         FiniteContinuousZernikeAnnulusMode, zero_dirichlet_bcs!, element_plotvalues,
-        FiniteContinuousZernikeAnnulus
+        FiniteContinuousZernikeAnnulus, finite_plotvalues
 
 include("diskelement.jl")
 include("annuluselement.jl")
