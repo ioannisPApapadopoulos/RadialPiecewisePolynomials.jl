@@ -147,7 +147,7 @@ end
     
     a11 = _sum_semiclassicaljacobiweight(t,2,0,m) / t^2
     a12 = jw
-    a22 = s_sum_semiclassicaljacobiweight(t,0,2,m) / t^2
+    a22 = _sum_semiclassicaljacobiweight(t,0,2,m) / t^2
     
     C = [a11 a12 a'; a12 a22 b']
     M = Hcat(Vcat(C[1:2,3:4]', Zeros{T}(∞,2)), M)
