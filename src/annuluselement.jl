@@ -119,6 +119,12 @@ end
 ###
 # L2 inner product
 ###
+
+function _sum_semiclassicaljacobiweight(t::T, a::Number, b::Number, c::Number) where T
+    (t,a,b,c) = map(big, map(float, (t,a,b,c)))
+    return convert(T, t^c * beta(1+a,1+b) * _₂F₁general2(1+a,-c,2+a+b,1/t))
+end
+
 @simplify function *(A::QuasiAdjoint{<:Any,<:ContinuousZernikeAnnulusElementMode}, B::ContinuousZernikeAnnulusElementMode)
     T = promote_type(eltype(A), eltype(B))
     @assert A' == B
@@ -134,14 +140,14 @@ end
     m₀ = convert(T,π) / ( t^(one(T) + m) )
     m₀ = m == 0 ? m₀ : m₀ / T(2)
     
-    jw = sum(SemiclassicalJacobiWeight{T}(t,1,1,m)) / t^2
+    jw = _sum_semiclassicaljacobiweight(t,1,1,m) / t^2
     M = jw.*L₁₁
     a = jw.*L₁₀[1:2,1]
     b = jw.*L₀₁[1:2,1]
     
-    a11 = sum(SemiclassicalJacobiWeight{T}(t,2,0,m)) / t^2
+    a11 = _sum_semiclassicaljacobiweight(t,2,0,m) / t^2
     a12 = jw
-    a22 = sum(SemiclassicalJacobiWeight{T}(t,0,2,m)) / t^2
+    a22 = s_sum_semiclassicaljacobiweight(t,0,2,m) / t^2
     
     C = [a11 a12 a'; a12 a22 b']
     M = Hcat(Vcat(C[1:2,3:4]', Zeros{T}(∞,2)), M)
@@ -210,7 +216,7 @@ end
     
     # Contribution from the normalisation <w R_m,j^(ρ,1,1,0),R_m,j^(ρ,1,1,0)>_L^2
     t = inv(one(T)-ρ^2)
-    jw = sum(SemiclassicalJacobiWeight{T}(t,1,1,m))
+    jw = _sum_semiclassicaljacobiweight(t,1,1,m)
     m₀ = convert(T,π) / ( t^(3 + m) ) * jw
     m₀ = m == 0 ? m₀ : m₀ / T(2)
     
