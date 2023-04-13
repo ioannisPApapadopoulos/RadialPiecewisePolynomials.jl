@@ -62,10 +62,14 @@ end
         M[2, N+1:N+3] = Ms[2][1,2:4] / γs[1]
         M[N+1:N+3,2] = Ms[2][2:4,1] / γs[1]
 
+        b = min(N-1, 3)
         for k in 2:K-1
             M[N+(k-2)*(N-1)+1, N+(k-2)*(N-1)+1] += Ms[k+1][1,1] / γs[k]^2
-            M[N+(k-2)*(N-1)+1, N+(k-1)*(N-1)+1:N+(k-1)*(N-1)+3] = Ms[k+1][1,2:4] / γs[k]
-            M[N+(k-1)*(N-1)+1:N+(k-1)*(N-1)+3, N+(k-2)*(N-1)+1] = Ms[k+1][2:4,1] / γs[k]
+            M[N+(k-2)*(N-1)+1, N+(k-1)*(N-1)+1:N+(k-1)*(N-1)+b] = Ms[k+1][1,2:b+1] / γs[k]
+            M[N+(k-1)*(N-1)+1:N+(k-1)*(N-1)+b, N+(k-2)*(N-1)+1] = Ms[k+1][2:b+1,1] / γs[k]
+            # M[N+(k-2)*(N-1)+1, N+(k-2)*(N-1)+1] += Ms[k+1][1,1] / γs[k]^2
+            # M[N+(k-2)*(N-1)+1, N+(k-1)*(N-1)+1:N+(k-1)*(N-1)+b] = Ms[k+1][1,2:b+1] / γs[k]
+            # M[N+(k-1)*(N-1)+1:N+(k-1)*(N-1)+b, N+(k-2)*(N-1)+1] = Ms[k+1][2:b+1,1] / γs[k]
         end
     end
     return M
@@ -75,21 +79,23 @@ end
 # Gradient for constructing weak Laplacian.
 ###
 
-struct GradientFiniteContinuousZernikeAnnulusMode{T, N<:Int, P<:AbstractVector, M<:Int, J<:Int}<:Basis{T}
+struct GradientFiniteContinuousZernikeAnnulusMode{T, N<:Int, P<:AbstractVector, M<:Int, J<:Int, B<:Int}<:Basis{T}
     N::N
     points::P
     m::M
     j::J
+    b::B
 end
 
-GradientFiniteContinuousZernikeAnnulusMode{T}(N::Int, points::AbstractVector, m::Int, j::Int) where {T} =  GradientFiniteContinuousZernikeAnnulusMode{T,Int, typeof(points), Int, Int}(N, points, m, j)
-GradientFiniteContinuousZernikeAnnulusMode(N::Int, points::AbstractVector, m::Int, j::Int) =  GradientFiniteContinuousZernikeAnnulusMode{Float64}(N, points, m, j)
+GradientFiniteContinuousZernikeAnnulusMode{T}(N::Int, points::AbstractVector, m::Int, j::Int, b::Int) where {T} =  GradientFiniteContinuousZernikeAnnulusMode{T,Int, typeof(points), Int, Int, Int}(N, points, m, j, b)
+GradientFiniteContinuousZernikeAnnulusMode(N::Int, points::AbstractVector, m::Int, j::Int, b::Int) =  GradientFiniteContinuousZernikeAnnulusMode{Float64}(N, points, m, j, b)
+GradientFiniteContinuousZernikeAnnulusMode(N::Int, points::AbstractVector, m::Int, j::Int) = GradientFiniteContinuousZernikeAnnulusMode{Float64}(N, points, m, j, m+2N)
 
 axes(Z:: GradientFiniteContinuousZernikeAnnulusMode) = (Inclusion(last(Z.points)*UnitDisk{eltype(Z)}()), oneto(Z.N*(length(Z.points)-1)-(length(Z.points)-2)))
-==(P:: GradientFiniteContinuousZernikeAnnulusMode, Q:: GradientFiniteContinuousZernikeAnnulusMode) = P.points == Q.points && P.m == Q.m && P.j == Q.j
+==(P:: GradientFiniteContinuousZernikeAnnulusMode, Q:: GradientFiniteContinuousZernikeAnnulusMode) = P.points == Q.points && P.m == Q.m && P.j == Q.j && P.b == Q.b
 
 @simplify function *(D::Derivative, C::FiniteContinuousZernikeAnnulusMode)
-    GradientFiniteContinuousZernikeAnnulusMode(C.N, C.points, C.m, C.j)
+    GradientFiniteContinuousZernikeAnnulusMode(C.N, C.points, C.m, C.j, C.b)
 end
 
 @simplify function *(A::QuasiAdjoint{<:Any,<:GradientFiniteContinuousZernikeAnnulusMode}, B::GradientFiniteContinuousZernikeAnnulusMode)
@@ -116,10 +122,14 @@ end
         Δ[2, N+1:N+3] = Δs[2][1,2:4] / γs[1]
         Δ[N+1:N+3,2] = Δs[2][2:4,1] / γs[1]
 
+        b = min(N-1, 3)
         for k in 2:K-1  
             Δ[N+(k-2)*(N-1)+1, N+(k-2)*(N-1)+1] += Δs[k+1][1,1] / γs[k]^2
-            Δ[N+(k-2)*(N-1)+1,N+(k-1)*(N-1)+1:N+(k-1)*(N-1)+3] = Δs[k+1][1,2:4] / γs[k]
-            Δ[N+(k-1)*(N-1)+1:N+(k-1)*(N-1)+3, N+(k-2)*(N-1)+1] = Δs[k+1][2:4,1] / γs[k]
+            Δ[N+(k-2)*(N-1)+1,N+(k-1)*(N-1)+1:N+(k-1)*(N-1)+b] = Δs[k+1][1,2:b+1] / γs[k]
+            Δ[N+(k-1)*(N-1)+1:N+(k-1)*(N-1)+b, N+(k-2)*(N-1)+1] = Δs[k+1][2:b+1,1] / γs[k]
+            # Δ[N+(k-2)*(N-1)+1, N+(k-2)*(N-1)+1] += Δs[k+1][1,1] / γs[k]^2
+            # Δ[N+(k-2)*(N-1)+1,N+(k-1)*(N-1)+1:N+(k-1)*(N-1)+3] = Δs[k+1][1,2:4] / γs[k]
+            # Δ[N+(k-1)*(N-1)+1:N+(k-1)*(N-1)+3, N+(k-2)*(N-1)+1] = Δs[k+1][2:4,1] / γs[k]
         end
     end
 
@@ -127,7 +137,7 @@ end
 end
 
 function zero_dirichlet_bcs!(F::FiniteContinuousZernikeAnnulusMode{T}, Δ::AbstractMatrix{T}, Mf::AbstractVector{T}) where T
-    N = F.N; K = length(F.points)-1
+    N = F.N; K = length(F.points)-1;
     Δ[:,1].=0; Δ[1,:].=0; Δ[1,1]=1.; 
     Δ[N+(K-2)*(N-1)+1,:].=0; Δ[:,N+(K-2)*(N-1)+1].=0; Δ[N+(K-2)*(N-1)+1,N+(K-2)*(N-1)+1]=1.;
     Mf[1]=0; Mf[N+(K-2)*(N-1)+1]=0;
