@@ -20,11 +20,12 @@ export SVector, Zeros, Ones, Vcat, Derivative, pad, paddeddata, Hcat,
         ContinuousZernikeElementMode, ContinuousZernikeAnnulusElementMode, grid, plotvalues, plotannulus,
         ContinuousZernikeAnnulusMode,
         FiniteContinuousZernikeAnnulusMode, zero_dirichlet_bcs!, element_plotvalues,
-        FiniteContinuousZernikeAnnulus, finite_plotvalues
+        FiniteContinuousZernikeAnnulus, finite_plotvalues, inf_error, plot
 
 include("diskelement.jl")
 include("annuluselement.jl")
 include("finiteannulusmode.jl")
 include("finiteannulus.jl")
 include("annulus.jl")
+# include("plots.jl")
 end # module
