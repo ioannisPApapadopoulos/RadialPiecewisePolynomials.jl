@@ -55,15 +55,13 @@ end
 ###
 
 function _ann2element(t::T, m::Int) where T
-
-    Q₀₀ = SemiclassicalJacobi{T}(t, 0, 0, m)
-    Q₀₁ = SemiclassicalJacobi{T}(t, 0, 1, m)
-    Q₁₀ = SemiclassicalJacobi{T}(t, 1, 0, m)
     Q₁₁ = SemiclassicalJacobi{T}(t, 1, 1, m)
-
-    L₁₁ = (Weighted(Q₀₀) \ Weighted(Q₁₁)) / t^2
-    L₀₁ = (Weighted(Q₀₀) \ Weighted(Q₀₁)) / t
-    L₁₀ = (Weighted(Q₀₀) \ Weighted(Q₁₀)) / t
+    
+    x = axes(Q₁₁, 1)
+    X = Q₁₁ \ (x.*Q₁₁)
+    L₁₁ = (X - X*X)/t^2
+    L₀₁ = (I - X)/t
+    L₁₀ = X/t
 
     (L₁₁, L₀₁, L₁₀)
 end
@@ -90,7 +88,7 @@ function ldiv(C::ContinuousZernikeAnnulusElementMode{V}, f::AbstractQuasiVector)
     α, β = convert(T, first(C.points)), convert(T, last(C.points))
     ρ = α / β
     m, j = C.m, C.j
-    Z = ZernikeAnnulus{T}(ρ, 0, 0)
+    Z = ZernikeAnnulus{T}(ρ, one(T), one(T))
     x = axes(Z,1)
     # # Need to take into account different scalings
     if β ≉  1
@@ -112,7 +110,7 @@ function ldiv(C::ContinuousZernikeAnnulusElementMode{V}, f::AbstractQuasiVector)
     (L₁₁, L₀₁, L₁₀) = _ann2element(t, m)
     R̃ = [L₁₀[:,1] L₀₁[:,1] L₁₁]
 
-    # convert from ZernikeAnnulus(ρ,0,0) to hats + Bubble
+    # convert from ZernikeAnnulus(ρ,1,1) to hats + Bubble
     dat = R̃[1:N,1:N] \ c̃
     cfs = T[]
     pad(append!(cfs, dat), axes(C,2))
@@ -121,35 +119,39 @@ end
 ###
 # L2 inner product
 ###
+
+function _sum_semiclassicaljacobiweight(t::T, a::Number, b::Number, c::Number) where T
+    (t,a,b,c) = map(big, map(float, (t,a,b,c)))
+    return convert(T, t^c * beta(1+a,1+b) * _₂F₁general2(1+a,-c,2+a+b,1/t))
+end
+
 @simplify function *(A::QuasiAdjoint{<:Any,<:ContinuousZernikeAnnulusElementMode}, B::ContinuousZernikeAnnulusElementMode)
     T = promote_type(eltype(A), eltype(B))
     @assert A' == B
 
     α, β = convert(T, first(B.points)), convert(T, last(B.points))
     ρ = α / β
-    m, j = B.m, B.j
+    m = B.m
 
     t = inv(one(T)-ρ^2)
     (L₁₁, L₀₁, L₁₀) = _ann2element(t, m)
 
-    # Contribution from the mass matrix <R_m,j^(ρ,0,0,0),R_m,j^(ρ,0,0,0)>_L^2
-    jw = sum(SemiclassicalJacobiWeight{T}(t,0,0,m))
-    m₀ = convert(T,π) / ( t^(one(T) + m) ) * jw
+    # Contribution from the mass matrix of harmonic polynomial
+    m₀ = convert(T,π) / ( t^(one(T) + m) )
     m₀ = m == 0 ? m₀ : m₀ / T(2)
-
-    M = L₁₁' *  L₁₁
-
-    a = ((L₁₁)'[1:2,:] * L₁₀[:,1])
-    b = ((L₁₁)'[1:2,:] * L₀₁[:,1])
-
-    a11 = ((L₁₀)'[1,:]' * L₁₀[:,1])
-    a12 = ((L₁₀)'[1,:]' * L₀₁[:,1])
-    a22 = ((L₀₁)'[1,:]' * L₀₁[:,1])
     
-    C = [a11' a12' a'; a12' a22' b']
-
-    M = [[C[1:2,3:4]'; Zeros{T}(∞,2)] M]
-    β^2*m₀*Vcat([C Zeros{T}(2,∞)], M)
+    jw = _sum_semiclassicaljacobiweight(t,1,1,m) / t^2
+    M = jw.*L₁₁
+    a = jw.*L₁₀[1:2,1]
+    b = jw.*L₀₁[1:2,1]
+    
+    a11 = _sum_semiclassicaljacobiweight(t,2,0,m) / t^2
+    a12 = jw
+    a22 = _sum_semiclassicaljacobiweight(t,0,2,m) / t^2
+    
+    C = [a11 a12 a'; a12 a22 b']
+    M = Hcat(Vcat(C[1:2,3:4]', Zeros{T}(∞,2)), M)
+    β^2*m₀*Vcat(Hcat(C, Zeros{T}(2,∞)), M)
 end
 
 ###
@@ -214,7 +216,7 @@ end
     
     # Contribution from the normalisation <w R_m,j^(ρ,1,1,0),R_m,j^(ρ,1,1,0)>_L^2
     t = inv(one(T)-ρ^2)
-    jw = sum(SemiclassicalJacobiWeight{T}(t,1,1,m))
+    jw = _sum_semiclassicaljacobiweight(t,1,1,m)
     m₀ = convert(T,π) / ( t^(3 + m) ) * jw
     m₀ = m == 0 ? m₀ : m₀ / T(2)
     
@@ -238,7 +240,7 @@ end
 ###
 
 function grid(C::ContinuousZernikeAnnulusElementMode{T}, j::Int) where T
-    Z = ZernikeAnnulus{T}(C.points[1]/C.points[2], 0, 0)
+    Z = ZernikeAnnulus{T}(C.points[1]/C.points[2], one(T), one(T))
     AlgebraicCurveOrthogonalPolynomials.grid(Z, Block(j+C.m))
 end
 
@@ -258,7 +260,7 @@ function bubble2ann(α::T, β::T, m::Int, c::AbstractVector{T}) where T
     if c isa LazyArray
         c = paddeddata(c)
     end
-    R̃[1:length(c), 1:length(c)] * c # coefficients for ZernikeAnnulus(ρ,0,0)
+    R̃[1:length(c), 1:length(c)] * c # coefficients for ZernikeAnnulus(ρ,1,1)
 end
 
 function plotvalues(u::ApplyQuasiVector{T,typeof(*),<:Tuple{ContinuousZernikeAnnulusElementMode, AbstractVector}}) where T
@@ -267,7 +269,7 @@ function plotvalues(u::ApplyQuasiVector{T,typeof(*),<:Tuple{ContinuousZernikeAnn
     ρ = α / β
     m = C.m
 
-    Z = ZernikeAnnulus{T}(ρ, 0, 0)
+    Z = ZernikeAnnulus{T}(ρ, one(T), one(T))
 
     c̃ = bubble2ann(α, β, m, c)
     
@@ -287,7 +289,7 @@ function plotvalues(u::ApplyQuasiVector{T,typeof(*),<:Tuple{ContinuousZernikeAnn
     g = scalegrid(grid(C, N), α, β)
 
     # Use fast transforms for synthesis
-    FT = ZernikeAnnulusITransform{T}(N+C.m, 0, 0, 0, Z.ρ)
+    FT = ZernikeAnnulusITransform{T}(N+C.m, 1, 1, 0, Z.ρ)
     g, FT * pad(F,axes(Z,2))[Block.(OneTo(N+C.m))]
 end
 
