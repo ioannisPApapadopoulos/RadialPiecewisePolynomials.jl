@@ -20,7 +20,7 @@ end
 
 ρ = 0.2
 points = [ρ;0.3;0.5;0.8;1.0]; K = length(points)-1
-N=30; F = FiniteContinuousZernikeAnnulus(N, points)
+N=40; F = FiniteContinuousZernikeAnnulus(N, points)
 
 x = axes(F,1)
 

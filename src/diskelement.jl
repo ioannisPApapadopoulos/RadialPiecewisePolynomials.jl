@@ -43,7 +43,7 @@ function grid(C::ContinuousZernikeElementMode{T}, n::Integer) where T
     RadialCoordinate.(sinpi.((N .-(0:N-1) .- one(T)/2) ./ (2N)), 0.)
 end
 
-function fa(f, r, xy)
+function _scale_fcn(f, r::T, xy::AbstractArray) where T
     rθ = RadialCoordinate(xy)
     r̃ = affine(0.. 1, 0.. r)[rθ.r]
     xỹ = SVector(r̃*cos(rθ.θ), r̃*sin(rθ.θ))
@@ -56,19 +56,20 @@ function ldiv(C::ContinuousZernikeElementMode{V}, f::AbstractQuasiVector) where 
     r = f.args[1].domain.radius
     # Need to take into account different scalings
     if r ≉  1
-        fc(xy) = fa(f.f, r, xy)
+        fc(xy) = _scale_fcn(f.f, r, xy)
         x = axes(Z,1)
         f̃ = fc.(x)
     else
         f̃ = f
     end
 
+    # Seems to cache on its own, no need to memoize unlike annulus
     c = Z\f̃ # Zernike transform
     c̃ = paddeddata(c)
     N = size(c̃.matrix, 1) # degree
     
     # Restrict to relevant mode and add a column corresponding to the hat function.
-    R = Z \ Weighted(Z)
+    R = Z \ Weighted(Z) # Very fast and does not change with width of disk.
 
     # BUG! Random factor of 2, Issue raised: https://github.com/JuliaApproximation/MultivariateOrthogonalPolynomials.jl/issues/141 
     R̃ =  [[T[1]; Zeros{T}(∞)] R.ops[C.m+1]/2]
@@ -83,15 +84,14 @@ end
 # L2 inner product
 ###
 @simplify function *(A::QuasiAdjoint{<:Any,<:ContinuousZernikeElementMode}, B::ContinuousZernikeElementMode)
-    # error("Need to check constants.")
     T = promote_type(eltype(A), eltype(B))
     @assert A' == B
-    # Lb = Zernike(0,0) \ Weighted(Zernike(0,1))
-    # M = Lb.ops[B.m+1]' * Lb.ops[B.m+1]
-    Lb = Normalized(Jacobi(0,B.m)) \ HalfWeighted{:a}(Normalized(Jacobi(1,B.m)))
-    M = 0.5*Lb' * Lb
-    M = [[T[1]; Zeros{T}(∞)] M]
-    Vcat([T[B.m+2]; T[1]; Zeros{T}(∞)]', M)
+    ρ = convert(T, last(B.points))
+
+    X = jacobimatrix(Normalized(Jacobi{T}(1,B.m)))
+    M = ρ^2*(I-X)/2
+    M = [[T[ρ^2]; Zeros{T}(∞)] M]
+    Vcat([T[ρ^2*(B.m+2)]; T[ρ^2]; Zeros{T}(∞)]', M)
 end
 
 ###
@@ -116,12 +116,11 @@ end
 
 @simplify function *(A::QuasiAdjoint{<:Any,<:GradientContinuousZernikeElementMode}, B::GradientContinuousZernikeElementMode)
     T = promote_type(eltype(A), eltype(B))
-    β = last(B.points)
     Z = Zernike(0,1)
     D = Z \ (Laplacian(axes(Z,1))*Weighted(Z))
 
-    Δ = -inv(β^2)*D.ops[B.m+1]
-    cₘ = inv(β^2)*π*B.m*zerniker(B.m,B.m,0,1,one(T))^2 # = <Z^(0,1)_{m,m,j}, Z^(0,1)_{m,m,j}>_L^2
+    Δ = -D.ops[B.m+1]
+    cₘ = π*B.m*zerniker(B.m,B.m,0,1,one(T))^2 # = <Z^(0,1)_{m,m,j}, Z^(0,1)_{m,m,j}>_L^2
 
     Vcat([T[cₘ]; Zeros{T}(∞)]', [Zeros{T}(∞) Δ])
 end
