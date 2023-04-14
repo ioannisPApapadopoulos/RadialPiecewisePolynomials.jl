@@ -64,7 +64,7 @@ function ldiv(C::ContinuousZernikeElementMode{V}, f::AbstractQuasiVector) where 
     end
 
     # Seems to cache on its own, no need to memoize unlike annulus
-    c = Z\f̃ # Zernike transform
+    c = Z \ f̃ # Zernike transform
     c̃ = paddeddata(c)
     N = size(c̃.matrix, 1) # degree
     
@@ -123,4 +123,62 @@ end
     cₘ = π*B.m*zerniker(B.m,B.m,0,1,one(T))^2 # = <Z^(0,1)_{m,m,j}, Z^(0,1)_{m,m,j}>_L^2
 
     Vcat([T[cₘ]; Zeros{T}(∞)]', [Zeros{T}(∞) Δ])
+end
+
+###
+# Plotting
+###
+
+_angle(rθ::RadialCoordinate) = rθ.θ
+
+function grid(C::ContinuousZernikeElementMode{T}, j::Int) where T
+    Z = Zernike{T}(zero(T), one(T))
+    MultivariateOrthogonalPolynomials.grid(Z, Block(j+C.m))
+    # θ = [map(_angle,g[1,:]); 0]
+    # [permutedims(RadialCoordinate.(1,θ)); g g[:,1]; permutedims(RadialCoordinate.(0,θ))][:,1:end-1]
+end
+
+function scalegrid(g::Matrix{RadialCoordinate{T}}, ρ::T) where T
+    rs = x -> affine(0.. 1, 0.. ρ)[x.r]
+    gs = (x, r) -> RadialCoordinate(SVector(r*cos(x.θ), r*sin(x.θ)))
+    r̃ = map(rs, g)
+    gs.(g, r̃)
+end
+
+function bubble2disk(m::Int, c::AbstractVector{T}) where T
+    Z = Zernike{T}(0,1)
+    R = Z \ Weighted(Z) # Very fast and does not change with width of disk.
+    R̃ =  [[T[1]; Zeros{T}(∞)] R.ops[m+1]/2]
+    if c isa LazyArray
+        c = paddeddata(c)
+    end
+    R̃[1:length(c), 1:length(c)] * c # coefficients for Zernike(0,1)
+end
+
+function plotvalues(u::ApplyQuasiVector{T,typeof(*),<:Tuple{ContinuousZernikeElementMode, AbstractVector}}) where T
+    C, c = u.args
+    ρ = convert(T, last(C.points))
+    m = C.m
+
+    Z = Zernike{T}(0,1)
+    c̃ = bubble2disk(m, c)
+
+    # Massage coeffcients into ModalTrav form.
+    N = (isqrt(8*sum(1:2*length(c̃)+C.m-1)+1)-1) ÷ 2
+    m = N ÷ 2 + 1
+    n = 4(m-1) + 1
+
+    f = zeros(T,m,n)
+    f[:, 2C.m + C.j]= [c̃; zeros(size(f,1)-length(c̃))]
+    F = ModalTrav(f)
+
+    N = size(f,1)
+    # Scale the grid
+    g = scalegrid(grid(C, 2N), ρ)
+
+    # g, (Z*pad(F,axes(Z,2)))[grid(C,N)]
+
+    # Use fast transforms for synthesis
+    FT = ZernikeITransform{T}(2N+C.m, 0, 1)
+    g, FT * pad(F,axes(Z,2))[Block.(OneTo(2N+C.m))]
 end

@@ -293,7 +293,7 @@ function plotvalues(u::ApplyQuasiVector{T,typeof(*),<:Tuple{ContinuousZernikeAnn
     g, FT * pad(F,axes(Z,2))[Block.(OneTo(N+C.m))]
 end
 
-function plotannulus(g::Matrix{RadialCoordinate{T}}, vals::Matrix{T}) where T
+function plot_helper(g::Matrix{RadialCoordinate{T}}, vals::Matrix{T}) where T
     p = g -> [g.r, g.θ]
     rθ = map(p, g)
     r = first.(rθ)[:,1]

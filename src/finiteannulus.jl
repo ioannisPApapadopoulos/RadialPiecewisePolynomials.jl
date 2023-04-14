@@ -123,17 +123,8 @@ function finite_plotvalues(F::FiniteContinuousZernikeAnnulus{T}, us::AbstractVec
         FT = ZernikeAnnulusITransform{T}(N, 1, 1, 0, ρ)
         val = FT * pad(ModalTrav(Ũs[:,:,k]),axes(Z,2))[Block.(OneTo(N))]
 
-        (θ, r, val) = plotannulus(g, val)
+        (θ, r, val) = plot_helper(g, val)
         append!(θs, [θ]); append!(rs, [r]); append!(vals, [val])
     end
     return (θs, rs, vals)
-end
-
-function inf_error(F::FiniteContinuousZernikeAnnulus{T}, θs::AbstractVector, rs::AbstractVector, vals::AbstractVector, u::Function) where T
-    vals_ = []
-    K = lastindex(F.points)-1
-    for k = 1:K
-        append!(vals_, [abs.(vals[k] - u.(RadialCoordinate.(rs[k],θs[k]')))])
-    end
-    vals_, sum(maximum.(vals_))
 end
