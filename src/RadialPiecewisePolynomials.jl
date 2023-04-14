@@ -16,15 +16,15 @@ import LazyArrays: Vcat
 import SpecialFunctions: beta
 import HypergeometricFunctions: _₂F₁general2
 
-export SVector, Zeros, Ones, Vcat, Derivative, pad, paddeddata, Hcat,
+export SVector, Zeros, Ones, Vcat, Derivative, pad, paddeddata, Hcat, RadialCoordinate,
         ContinuousZernikeElementMode, ContinuousZernikeAnnulusElementMode, grid, plotvalues, plot_helper,
         ContinuousZernikeAnnulusMode,
-        FiniteContinuousZernikeAnnulusMode, zero_dirichlet_bcs!, element_plotvalues,
-        FiniteContinuousZernikeAnnulus, finite_plotvalues, inf_error, plot,
-        FiniteContinuousZernikeMode
+        zero_dirichlet_bcs!, element_plotvalues,
+        finite_plotvalues, inf_error, plot,
+        FiniteContinuousZernikeMode, FiniteContinuousZernike
 
 include("diskelement.jl")
 include("annuluselement.jl")
 include("finitecontinuousmode.jl")
-include("finiteannulus.jl")
+include("finitecontinuous.jl")
 end # module

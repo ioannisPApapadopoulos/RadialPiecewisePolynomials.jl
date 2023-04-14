@@ -1,6 +1,6 @@
 using PyPlot
 
-function plot(F::FiniteContinuousZernikeAnnulus{T}, θs::AbstractVector, rs::AbstractVector, vals::AbstractVector) where T
+function plot(F::FiniteContinuousZernike{T}, θs::AbstractVector, rs::AbstractVector, vals::AbstractVector) where T
     K = lastindex(F.points)-1
     fig = plt.figure()
     ax = fig.add_subplot(111, projection="polar")
@@ -15,11 +15,11 @@ function plot(F::FiniteContinuousZernikeAnnulus{T}, θs::AbstractVector, rs::Abs
 end
 
 function plot(F::FiniteContinuousZernikeMode{T}, θs::AbstractVector, rs::AbstractVector, vals::AbstractVector) where T
-    G = FiniteContinuousZernikeAnnulus{T}(F.N, F.points)
+    G = FiniteContinuousZernike{T}(F.N, F.points)
     plot(G, θs, rs, vals)
 end
 
-function inf_error(F::FiniteContinuousZernikeAnnulus{T}, θs::AbstractVector, rs::AbstractVector, vals::AbstractVector, u::Function) where T
+function inf_error(F::FiniteContinuousZernike{T}, θs::AbstractVector, rs::AbstractVector, vals::AbstractVector, u::Function) where T
     vals_ = []
     K = lastindex(F.points)-1
     for k = 1:K
@@ -29,6 +29,6 @@ function inf_error(F::FiniteContinuousZernikeAnnulus{T}, θs::AbstractVector, rs
 end
 
 function inf_error(F::FiniteContinuousZernikeMode{T}, θs::AbstractVector, rs::AbstractVector, vals::AbstractVector, u::Function) where T
-    G = FiniteContinuousZernikeAnnulus{T}(F.N, F.points)
+    G = FiniteContinuousZernike{T}(F.N, F.points)
     inf_error(G, θs, rs, vals, u)
 end

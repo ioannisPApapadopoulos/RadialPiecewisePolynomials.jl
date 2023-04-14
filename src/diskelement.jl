@@ -27,7 +27,7 @@ function getindex(Z::ContinuousZernikeElementMode{T}, xy::StaticVector{2}, j::In
     xỹ = SVector(r̃*cos(rθ.θ), r̃*sin(rθ.θ))
     Z.m == 0 && @assert Z.j == 1
     if j == 1
-        Zernike{T}(0, 1)[xỹ, Block(1+Z.m)][Z.m+Z.j]
+        Zernike{T}(0,1)[xỹ, Block(1+Z.m)][Z.m+Z.j]
     else
         Weighted(Zernike{T}(0,1))[xỹ, Block(2j-3+Z.m)][Z.m+Z.j]
     end
@@ -43,17 +43,17 @@ function grid(C::ContinuousZernikeElementMode{T}, n::Integer) where T
     RadialCoordinate.(sinpi.((N .-(0:N-1) .- one(T)/2) ./ (2N)), 0.)
 end
 
-function _scale_fcn(f, r::T, xy::AbstractArray) where T
+function _scale_fcn(f::Function, r::T, xy::AbstractArray) where T
     rθ = RadialCoordinate(xy)
     r̃ = affine(0.. 1, 0.. r)[rθ.r]
     xỹ = SVector(r̃*cos(rθ.θ), r̃*sin(rθ.θ))
     f(xỹ)
 end
 
-function ldiv(C::ContinuousZernikeElementMode{V}, f::AbstractQuasiVector) where V
-    T = promote_type(V, eltype(f))
+function ldiv(C::ContinuousZernikeElementMode{T}, f::AbstractQuasiVector) where T
+    # T = promote_type(V, eltype(f))
     Z = Zernike{T}(0,1)
-    r = f.args[1].domain.radius
+    r = convert(T, f.args[1].domain.radius)
     # Need to take into account different scalings
     if r ≉  1
         fc(xy) = _scale_fcn(f.f, r, xy)
@@ -75,9 +75,15 @@ function ldiv(C::ContinuousZernikeElementMode{V}, f::AbstractQuasiVector) where 
     R̃ =  [[T[1]; Zeros{T}(∞)] R.ops[C.m+1]/2]
 
     # convert from Zernike(0,1) to hat + Bubble
-    dat = R̃[1:N,1:N] \ c̃.matrix[:, 2*C.m + C.j]
+    # Using adaptive ldiv, so possible we terminate before the required truncation
+    # in FiniteContinuousZernike. So seperate case for that.
     cfs = T[]
-    pad(append!(cfs, dat), axes(C,2))
+    if 2*C.m + C.j ≤ size(c̃.matrix, 2)
+        dat = R̃[1:N,1:N] \ c̃.matrix[:, 2*C.m + C.j]
+        return pad(append!(cfs, dat), axes(C,2))
+    else
+        return pad(append!(cfs, zero(T)), axes(C,2))
+    end
 end
 
 ###

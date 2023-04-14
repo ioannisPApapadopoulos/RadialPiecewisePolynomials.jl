@@ -82,9 +82,8 @@ end
     pad(Z[:, Block.(1:b)]\f̃, axes(Z,2))
 end
 
-function ldiv(C::ContinuousZernikeAnnulusElementMode{V}, f::AbstractQuasiVector) where V
+function ldiv(C::ContinuousZernikeAnnulusElementMode{T}, f::AbstractQuasiVector) where T
     # T = promote_type(V, eltype(f))
-    T = V
     α, β = convert(T, first(C.points)), convert(T, last(C.points))
     ρ = α / β
     m, j = C.m, C.j

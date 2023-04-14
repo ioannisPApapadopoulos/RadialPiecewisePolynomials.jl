@@ -31,8 +31,30 @@ function _getγs(points::AbstractArray{T}, m::Int) where T
     K = length(points)-1
     first(points) > 0 && return [(one(T)-(points[k+1]/points[k+2])^2)*(points[k+1]/points[k+2])^m / (one(T)-(points[k]/points[k+1])^2) for k in 1:K-1]
     γ = [(one(T)-(points[k+1]/points[k+2])^2)*(points[k+1]/points[k+2])^m / (one(T)-(points[k]/points[k+1])^2) for k in 2:K-1]
-    return append!([(one(T)-(points[2]/points[3])^2)*(points[2]/points[3])^m / sqrt(T(2)/convert(T,π))],γ)
+    return append!([(one(T)-(points[2]/points[3])^2)*(points[2]/points[3])^m / (sqrt(convert(T,2)^(m+3-iszero(m))/π) * normalizedjacobip(0, 1, m, 1.0))],γ)
 end
+
+# function getindex(F::FiniteContinuousZernikeMode{T}, xy::StaticVector{2}, j::Int)::T where {T}
+#     points = T.(F.points); K = length(points)-1
+#     N = F.N; m = F.m; j = F.j;
+#     Cs = _getCs(points, m, j, F.b)
+#     γs = _getγs(points, m)
+#     Ns = append!([N], [N+k*(N-1) for k in 2:K])
+
+#     rθ = RadialCoordinate(xy)
+#     b = searchsortedlast(points, rθ.r)
+#     k = searchsortedlast(j, Ns)
+#     J = j - Ns[k]
+
+#     if J == 1
+#     if b == k
+
+
+#     else
+#         return zero(T)
+#     end
+# end
+
 
 function ldiv(F::FiniteContinuousZernikeMode{V}, f::AbstractQuasiVector) where V
     # T = promote_type(V, eltype(f))
