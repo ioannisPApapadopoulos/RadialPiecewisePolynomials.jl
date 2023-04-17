@@ -82,9 +82,8 @@ end
     pad(Z[:, Block.(1:b)]\f̃, axes(Z,2))
 end
 
-function ldiv(C::ContinuousZernikeAnnulusElementMode{V}, f::AbstractQuasiVector) where V
+function ldiv(C::ContinuousZernikeAnnulusElementMode{T}, f::AbstractQuasiVector) where T
     # T = promote_type(V, eltype(f))
-    T = V
     α, β = convert(T, first(C.points)), convert(T, last(C.points))
     ρ = α / β
     m, j = C.m, C.j
@@ -293,7 +292,7 @@ function plotvalues(u::ApplyQuasiVector{T,typeof(*),<:Tuple{ContinuousZernikeAnn
     g, FT * pad(F,axes(Z,2))[Block.(OneTo(N+C.m))]
 end
 
-function plotannulus(g::Matrix{RadialCoordinate{T}}, vals::Matrix{T}) where T
+function plot_helper(g::Matrix{RadialCoordinate{T}}, vals::Matrix{T}) where T
     p = g -> [g.r, g.θ]
     rθ = map(p, g)
     r = first.(rθ)[:,1]
