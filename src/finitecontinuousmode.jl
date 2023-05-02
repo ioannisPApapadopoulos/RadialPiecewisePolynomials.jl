@@ -63,7 +63,15 @@ function ldiv(F::FiniteContinuousZernikeMode{V}, f::AbstractQuasiVector) where V
     N = F.N; m = F.m; j = F.j;
     Cs = _getCs(points, m, j, F.b)
     fs = [C \ f.f.(axes(C, 1)) for C in Cs]
-    f = fs[1][1:N]; for k in 2:K  f = vcat(f, fs[k][2:N]) end
+
+    f = fs[K][2:N]; for k in K-1:-1:2  f = vcat(fs[k+1][1], fs[k][3:N], f) end
+
+    if first(points) ≈ 0
+        f = vcat(fs[2][1], fs[1][2:N], f)
+    else
+        f = vcat(fs[1][1], fs[2][1], fs[1][3:N], f)
+    end
+
     return f
 end
 
@@ -71,6 +79,47 @@ end
 ###
 # L2 inner product
 ###
+function _piece_element_matrix(Ms, N::Int, K::Int, m::Int, points::AbstractVector{T}) where T
+    M = Hcat(Matrix(Ms[1][1:N, 1:N]), zeros(N,(K-1)*(N-1)))
+
+    if K > 1
+        γs = _getγs(points, m)
+        append!(γs, one(T))
+        for k in 2:K
+            M = Matrix(Vcat(M, Hcat(zeros(N-1, N+(k-2)*(N-1)), Ms[k][2:N, 2:N], zeros(N-1, (K-k)*(N-1)))))
+        end
+
+        i = first(points) ≈ 0 ? 1 : 2 # disk or annulus?
+        M[i, 1:i+2] *= γs[1] # Convert the left-side hat function coefficients for continuity
+        M[1:i+2, i] *= γs[1]
+        M[i, i] += Ms[2][1,1] # Add the contribution from the right-side of the hat function
+
+        # Right-side of hat function with left-side of hat function in next element
+        M[i, N+1] = Ms[2][1,2]*γs[2]
+        M[N+1, i] = Ms[2][2,1]*γs[2]
+
+        # Right-side of hat function interaction with bubble functions
+        M[i, N+2:N+3] = Ms[2][1,3:4]
+        M[N+2:N+3,i] = Ms[2][3:4,1]
+
+        b = min(N-1, 3)
+        for k in 2:K-1
+            # Convert left-side of hat function coefficients for continuity
+            M[N+(k-2)*(N-1)+1, N+(k-2)*(N-1)+1:N+(k-2)*(N-1)+b] *= γs[k]
+            M[N+(k-2)*(N-1)+1:N+(k-2)*(N-1)+b, N+(k-2)*(N-1)+1] *= γs[k]
+            M[N+(k-2)*(N-1)+1, N+(k-2)*(N-1)+1] += Ms[k+1][1,1] # add contribution of right-side of hat function
+
+            # Right-side of hat function with left-side of hat function in next element
+            M[N+(k-2)*(N-1)+1, N+(k-1)*(N-1)+1] = Ms[k+1][1,2]*γs[k+1]
+            M[N+(k-1)*(N-1)+1, N+(k-2)*(N-1)+1] = Ms[k+1][2,1]*γs[k+1]
+
+            # Right-side of hat function interaction with bubble functions
+            M[N+(k-2)*(N-1)+1, N+(k-1)*(N-1)+2:N+(k-1)*(N-1)+b] = Ms[k+1][1,3:b+1]
+            M[N+(k-1)*(N-1)+2:N+(k-1)*(N-1)+b, N+(k-2)*(N-1)+1] = Ms[k+1][3:b+1,1]
+        end
+    end
+    return M
+end
 
 # FIXME: Need to make type-safe
 @simplify function *(A::QuasiAdjoint{<:Any,<:FiniteContinuousZernikeMode}, B::FiniteContinuousZernikeMode)
@@ -82,27 +131,8 @@ end
     Cs = _getCs(points, m, j, B.b)
 
     Ms = [C' * C for C in Cs]
-    M = Hcat(Matrix(Ms[1][1:N, 1:N]), zeros(N,(K-1)*(N-1)))
-    
-    if K > 1
-        γs = _getγs(points, m)
-        for k in 2:K
-            M = Matrix(Vcat(M, Hcat(zeros(N-1, N+(k-2)*(N-1)), Ms[k][2:N, 2:N], zeros(N-1, (K-k)*(N-1)))))
-        end
 
-        i = first(points) ≈ 0 ? 1 : 2
-        M[i, i] = M[i,i] + Ms[2][1,1] / γs[1]^2
-        M[i, N+1:N+3] = Ms[2][1,2:4] / γs[1]
-        M[N+1:N+3,i] = Ms[2][2:4,1] / γs[1]
-
-        b = min(N-1, 3)
-        for k in 2:K-1
-            M[N+(k-2)*(N-1)+1, N+(k-2)*(N-1)+1] += Ms[k+1][1,1] / γs[k]^2
-            M[N+(k-2)*(N-1)+1, N+(k-1)*(N-1)+1:N+(k-1)*(N-1)+b] = Ms[k+1][1,2:b+1] / γs[k]
-            M[N+(k-1)*(N-1)+1:N+(k-1)*(N-1)+b, N+(k-2)*(N-1)+1] = Ms[k+1][2:b+1,1] / γs[k]
-        end
-    end
-    return M
+    _piece_element_matrix(Ms, N, K, m, points)
 end
 
 ###
@@ -140,28 +170,7 @@ end
     Ds = [Derivative(x) for x in xs]
     Δs = [(D*C)' * (D*C) for (C, D) in zip(Cs, Ds)]
 
-
-    Δ = Hcat(Matrix(Δs[1][1:N, 1:N]), zeros(N,(K-1)*(N-1)))
-    if K > 1
-        γs = _getγs(points, m)
-        for k in 2:K
-            Δ = Matrix(Vcat(Δ, Hcat(zeros(N-1, N+(k-2)*(N-1)), Δs[k][2:N, 2:N], zeros(N-1, (K-k)*(N-1)))))
-        end
-
-        i = first(points) ≈ 0 ? 1 : 2
-        Δ[i, i] = Δ[i,i] + Δs[2][1,1] / γs[1]^2
-        Δ[i, N+1:N+2] = Δs[2][1,2:3] / γs[1]
-        Δ[N+1:N+2,i] = Δs[2][2:3,1] / γs[1]
-
-        b = min(N-1, 2)
-        for k in 2:K-1  
-            Δ[N+(k-2)*(N-1)+1, N+(k-2)*(N-1)+1] += Δs[k+1][1,1] / γs[k]^2
-            Δ[N+(k-2)*(N-1)+1,N+(k-1)*(N-1)+1:N+(k-1)*(N-1)+b] = Δs[k+1][1,2:b+1] / γs[k]
-            Δ[N+(k-1)*(N-1)+1:N+(k-1)*(N-1)+b, N+(k-2)*(N-1)+1] = Δs[k+1][2:b+1,1] / γs[k]
-        end
-    end
-
-    return Δ
+    return _piece_element_matrix(Δs, N, K, m, points)
 end
 
 function zero_dirichlet_bcs!(F::FiniteContinuousZernikeMode{T}, Δ::AbstractMatrix{T}, Mf::AbstractVector{T}) where T
@@ -187,13 +196,15 @@ function element_plotvalues(u::ApplyQuasiVector{T,typeof(*),<:Tuple{FiniteContin
     Cs = _getCs(points, m, j, C.b)
 
     γs = _getγs(points, m)
+    append!(γs, one(T))
 
-    uc = [pad(u[1:N], axes(Cs[1],2))]
     if first(points) ≈ 0 && K > 1
-        k=2; append!(uc, [pad([uc[k-1][1]/γs[k-1]; u[N+(k-2)*(N-1)+1:N+(k-1)*(N-1)]], axes(Cs[k],2))]) 
-        for k = 3:K append!(uc, [pad([uc[k-1][2]/γs[k-1]; u[N+(k-2)*(N-1)+1:N+(k-1)*(N-1)]], axes(Cs[k],2))]) end
+        uc = [pad([u[1]*γs[1];u[2:N]], axes(Cs[1],2))]
+        k=2; append!(uc, [pad([u[1]; u[N+(k-2)*(N-1)+1]*γs[k]; u[N+(k-2)*(N-1)+2:N+(k-1)*(N-1)]], axes(Cs[k],2))]) 
+        for k = 3:K append!(uc, [pad([u[N+(k-3)*(N-1)+1];u[N+(k-2)*(N-1)+1]*γs[k];u[N+(k-2)*(N-1)+2:N+(k-1)*(N-1)]], axes(Cs[k],2))]) end
     else
-        for k = 2:K append!(uc, [pad([uc[k-1][2]/γs[k-1]; u[N+(k-2)*(N-1)+1:N+(k-1)*(N-1)]], axes(Cs[k],2))]) end
+        uc = [pad([u[1];u[2]*γs[1];u[3:N]], axes(Cs[1],2))]
+        for k = 2:K append!(uc, [pad([u[N+(k-3)*(N-1)+1];u[N+(k-2)*(N-1)+1]*γs[k];u[N+(k-2)*(N-1)+2:N+(k-1)*(N-1)]], axes(Cs[k],2))]) end
     end
     
     θs=[]; rs=[]; valss=[];
