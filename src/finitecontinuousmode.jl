@@ -89,26 +89,31 @@ function _piece_element_matrix(Ms, N::Int, K::Int, m::Int, points::AbstractVecto
             M = Matrix(Vcat(M, Hcat(zeros(N-1, N+(k-2)*(N-1)), Ms[k][2:N, 2:N], zeros(N-1, (K-k)*(N-1)))))
         end
 
-        i = first(points) ≈ 0 ? 1 : 2
-        M[i, 1:i+2] *= γs[1]
+        i = first(points) ≈ 0 ? 1 : 2 # disk or annulus?
+        M[i, 1:i+2] *= γs[1] # Convert the left-side hat function coefficients for continuity
         M[1:i+2, i] *= γs[1]
-        M[i, i] += Ms[2][1,1]
+        M[i, i] += Ms[2][1,1] # Add the contribution from the right-side of the hat function
 
+        # Right-side of hat function with left-side of hat function in next element
         M[i, N+1] = Ms[2][1,2]*γs[2]
         M[N+1, i] = Ms[2][2,1]*γs[2]
 
+        # Right-side of hat function interaction with bubble functions
         M[i, N+2:N+3] = Ms[2][1,3:4]
         M[N+2:N+3,i] = Ms[2][3:4,1]
 
         b = min(N-1, 3)
         for k in 2:K-1
+            # Convert left-side of hat function coefficients for continuity
             M[N+(k-2)*(N-1)+1, N+(k-2)*(N-1)+1:N+(k-2)*(N-1)+b] *= γs[k]
             M[N+(k-2)*(N-1)+1:N+(k-2)*(N-1)+b, N+(k-2)*(N-1)+1] *= γs[k]
-            M[N+(k-2)*(N-1)+1, N+(k-2)*(N-1)+1] += Ms[k+1][1,1]
+            M[N+(k-2)*(N-1)+1, N+(k-2)*(N-1)+1] += Ms[k+1][1,1] # add contribution of right-side of hat function
 
+            # Right-side of hat function with left-side of hat function in next element
             M[N+(k-2)*(N-1)+1, N+(k-1)*(N-1)+1] = Ms[k+1][1,2]*γs[k+1]
             M[N+(k-1)*(N-1)+1, N+(k-2)*(N-1)+1] = Ms[k+1][2,1]*γs[k+1]
 
+            # Right-side of hat function interaction with bubble functions
             M[N+(k-2)*(N-1)+1, N+(k-1)*(N-1)+2:N+(k-1)*(N-1)+b] = Ms[k+1][1,3:b+1]
             M[N+(k-1)*(N-1)+2:N+(k-1)*(N-1)+b, N+(k-2)*(N-1)+1] = Ms[k+1][3:b+1,1]
         end
