@@ -96,12 +96,14 @@ function _bubble2disk_or_ann_all_modes(F::FiniteContinuousZernike{T}, us::Abstra
     for i in 1:2N-1
         m = ms[i]
         γs = _getγs(points, m)
-        Us[1:Ms[i],i,1] = us[i][1:Ms[i]]
+        append!(γs, one(T))
         if first(points) ≈ 0 && K > 1
-            k=2; Us[1:Ms[i],i,k] = [Us[1,i,k-1]/γs[k-1]; us[i][Ms[i]+(k-2)*(Ms[i]-1)+1:Ms[i]+(k-1)*(Ms[i]-1)]]
-            for k = 3:K Us[1:Ms[i],i,k] = [Us[2,i,k-1]/γs[k-1]; us[i][Ms[i]+(k-2)*(Ms[i]-1)+1:Ms[i]+(k-1)*(Ms[i]-1)]] end
+            Us[1:Ms[i],i,1] = [us[i][1]*γs[1]; us[i][2:Ms[i]]]
+            k=2; Us[1:Ms[i],i,k] = [us[i][1]; us[i][Ms[i]+(k-2)*(Ms[i]-1)+1]*γs[k]; us[i][Ms[i]+(k-2)*(Ms[i]-1)+2:Ms[i]+(k-1)*(Ms[i]-1)]]
+            for k = 3:K Us[1:Ms[i],i,k] = [us[i][Ms[i]+(k-3)*(Ms[i]-1)+1]; us[i][Ms[i]+(k-2)*(Ms[i]-1)+1]*γs[k];us[i][Ms[i]+(k-2)*(Ms[i]-1)+2:Ms[i]+(k-1)*(Ms[i]-1)]] end
         else
-            for k = 2:K Us[1:Ms[i],i,k] = [Us[2,i,k-1]/γs[k-1]; us[i][Ms[i]+(k-2)*(Ms[i]-1)+1:Ms[i]+(k-1)*(Ms[i]-1)]] end
+            Us[1:Ms[i],i,1] = [us[i][1]; us[i][2]*γs[1]; us[i][3:Ms[i]]]
+            for k = 2:K Us[1:Ms[i],i,k] = [us[i][Ms[i]+(k-3)*(Ms[i]-1)+1]; us[i][Ms[i]+(k-2)*(Ms[i]-1)+1]*γs[k];us[i][Ms[i]+(k-2)*(Ms[i]-1)+2:Ms[i]+(k-1)*(Ms[i]-1)]] end
         end
     end
 
