@@ -1,19 +1,46 @@
-struct FiniteContinuousZernikeMode{T, N<:Int, P<:AbstractVector, M<:Int, J<:Int, B<:Int} <: Basis{T}
-    N::N
-    points::P
-    m::M
-    j::J
-    b::B
+struct FiniteContinuousZernikeMode{T} <: Basis{T}
+    N::Int
+    points::AbstractVector{T}
+    m::Int
+    j::Int
+    L₁₁::Tuple{Vararg{AbstractMatrix{T}}}
+    L₀₁::Tuple{Vararg{AbstractMatrix{T}}}
+    L₁₀::Tuple{Vararg{AbstractMatrix{T}}}
+    D::Tuple{Vararg{AbstractMatrix{T}}}
+    b::Int # Should remove once adaptive expansion has been figured out.
 end
 
-function FiniteContinuousZernikeMode{T}(N::Int, points::AbstractVector, m::Int, j::Int, b::Int) where {T}
+function FiniteContinuousZernikeMode(N::Int, points::AbstractVector{T}, m::Int, j::Int, L₁₁, L₀₁, L₁₀, D, b::Int) where T
     @assert length(points) > 1 && points == sort(points)
     @assert m ≥ 0
     @assert m == 0 ? j == 1 : 0 ≤ j ≤ 1
-    FiniteContinuousZernikeMode{T, Int, typeof(points), Int, Int, Int}(N, points, m, j, b)
+    @assert length(L₁₁) == length(L₀₁) == length(L₁₀) == length(D) == length(points)-1
+    FiniteContinuousZernikeMode{T}(N, points, m, j, L₁₁, L₀₁, L₁₀, D, b)
 end
-FiniteContinuousZernikeMode(N::Int, points::AbstractVector, m::Int, j::Int, b::Int) = FiniteContinuousZernikeMode{Float64}(N, points, m, j, b)
-FiniteContinuousZernikeMode(N::Int, points::AbstractVector, m::Int, j::Int) = FiniteContinuousZernikeMode{Float64}(N, points, m, j, m+2N)
+
+function FiniteContinuousZernikeMode(N::Int, points::AbstractVector{T}, m::Int, j::Int) where {T}
+    K = length(points)-1
+    ρs = []
+    for k = 1:length(points)-1
+        α, β = convert(T, first(points[k])), convert(T, last(points[k+1]))
+        append!(ρs, [α / β])
+    end
+
+    ts = inv.(one(T) .- ρs.^2)
+    Ls = _ann2element_via_Jacobi.(ts, m)
+    L₁₁ = NTuple{K, AbstractMatrix}(first.(Ls))
+    L₀₁ = NTuple{K, AbstractMatrix}([Ls[k][2] for k in 1:K])
+    L₁₀ = NTuple{K, AbstractMatrix}(last.(Ls))
+
+    Z = ZernikeAnnulus{T}.(ρs,1,1)
+    D = (Z .\ (Laplacian.(axes.(Z,1)).*Weighted.(Z)))
+    D = NTuple{K, AbstractMatrix}([Ds.ops[m+1] for Ds in D])
+
+    FiniteContinuousZernikeMode(N, points, m, j, L₁₁, L₀₁, L₁₀, D, m+2N) 
+end
+
+FiniteContinuousZernikeMode(N::Int, points::AbstractVector, m::Int, j::Int, L₁₁, L₀₁, L₁₀, D, b::Int) = FiniteContinuousZernikeMode{Float64}(N, points, m, j, L₁₁, L₀₁, L₁₀, D, b)
+FiniteContinuousZernikeMode(N::Int, points::AbstractVector, m::Int, j::Int, L₁₁, L₀₁, L₁₀, D) = FiniteContinuousZernikeMode{Float64}(N, points, m, j, L₁₁, L₀₁, L₁₀, D, m+2N)
 
 function axes(Z::FiniteContinuousZernikeMode{T}) where T
     first(Z.points) ≈ 0 && return (Inclusion(last(Z.points)*UnitDisk{T}()), oneto(Z.N*(length(Z.points)-1)-(length(Z.points)-2)))
@@ -21,9 +48,13 @@ function axes(Z::FiniteContinuousZernikeMode{T}) where T
 end
 ==(P::FiniteContinuousZernikeMode, Q::FiniteContinuousZernikeMode) = P.N == Q.N && P.points == Q.points && P.m == Q.m && P.j == Q.j && P.b == Q.b
 
-function _getCs(points::AbstractVector{T}, m::Int, j::Int, b::Int) where T
+function _getCs(F::FiniteContinuousZernikeMode)
+    points, m, j, b, = F.points, F.m, F.j, F.b
+    L₁₁, L₀₁, L₁₀, D = F.L₁₁, F.L₀₁, F.L₁₀, F.D 
     K = length(points)-1
-    first(points) > 0 && return [ContinuousZernikeAnnulusElementMode{T}([points[k]; points[k+1]], m, j, b) for k in 1:K]
+    first(points) > 0 && return [ContinuousZernikeAnnulusElementMode([points[k]; points[k+1]], m, j, L₁₁[k], L₀₁[k], L₁₀[k], D[k], b) for k in 1:K]
+    
+    error("Fix disk element.")
     append!(Any[ContinuousZernikeElementMode{T}([points[1]; points[2]], m, j)], [ContinuousZernikeAnnulusElementMode{T}([points[k]; points[k+1]], m, j, b) for k in 2:K])
 end
 
@@ -58,10 +89,12 @@ end
 
 function ldiv(F::FiniteContinuousZernikeMode{V}, f::AbstractQuasiVector) where V
     # T = promote_type(V, eltype(f))
+
+    @warn "Expanding via ZernikeAnnulus is ill-conditioned, are you sure you want to expand your function in this basis?"
     T = V
     points = T.(F.points); K = length(points)-1
     N = F.N; m = F.m; j = F.j;
-    Cs = _getCs(points, m, j, F.b)
+    Cs = _getCs(F)
     fs = [C \ f.f.(axes(C, 1)) for C in Cs]
 
     f = fs[K][2:N]; for k in K-1:-1:2  f = vcat(fs[k+1][1], fs[k][3:N], f) end
@@ -127,8 +160,8 @@ end
     @assert A' == B
 
     points = T.(B.points); K = length(points)-1
-    N = B.N; m = B.m; j = B.j;
-    Cs = _getCs(points, m, j, B.b)
+    N = B.N; m = B.m;
+    Cs = _getCs(B)
 
     Ms = [C' * C for C in Cs]
 
@@ -164,7 +197,7 @@ end
 
     points = T.(B.points); K = length(points)-1
     N = B.N; m = B.m; j = B.j;
-    Cs = _getCs(points, m, j, B.b)
+    Cs = _getCs(B)
     
     xs = [axes(C,1) for C in Cs]
     Ds = [Derivative(x) for x in xs]
@@ -193,7 +226,7 @@ function element_plotvalues(u::ApplyQuasiVector{T,typeof(*),<:Tuple{FiniteContin
     C, u = u.args 
     points = T.(C.points); K = length(points)-1
     N = C.N; m = C.m; j = C.j
-    Cs = _getCs(points, m, j, C.b)
+    Cs = _getCs(C)
 
     γs = _getγs(points, m)
     append!(γs, one(T))
