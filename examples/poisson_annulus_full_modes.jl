@@ -26,13 +26,13 @@ x = axes(F,1)
 
 f = F \ rhs_xy.(x)
 (θs, rs, vals) = finite_plotvalues(F, f)
-vals_, error = inf_error(F, θs, rs, vals, rhs_xy) # Check inf-norm errors on the grid
-error
+vals_, err = inf_error(F, θs, rs, vals, rhs_xy) # Check inf-norm errors on the grid
+err
 plot(F, θs, rs, vals)
 
 # Solve Poisson equation in weak form
 M = F' * F # list of mass matrices for each Fourier mode
-D = Derivative(axes(F,1))
+D = Derivative(x)
 Δ = (D*F)' * (D*F) # list of stiffness matrices for each Fourier mode
 
 Mf = M .* f # right-hand side
@@ -42,6 +42,6 @@ zero_dirichlet_bcs!(F, Δ, Mf) # bcs
 u = Δ .\ Mf
 
 (θs, rs, vals) = finite_plotvalues(F, u)
-vals_, error = inf_error(F, θs, rs, vals, ua_xy) # Check inf-norm errors on the grid
-error
+vals_, err = inf_error(F, θs, rs, vals, ua_xy) # Check inf-norm errors on the grid
+err
 plot(F, θs, rs, vals) # plot

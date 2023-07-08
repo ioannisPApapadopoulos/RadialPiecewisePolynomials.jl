@@ -39,8 +39,8 @@ function FiniteContinuousZernikeMode(N::Int, points::AbstractVector{T}, m::Int, 
     FiniteContinuousZernikeMode(N, points, m, j, L₁₁, L₀₁, L₁₀, D, m+2N) 
 end
 
-FiniteContinuousZernikeMode(N::Int, points::AbstractVector, m::Int, j::Int, L₁₁, L₀₁, L₁₀, D, b::Int) = FiniteContinuousZernikeMode{Float64}(N, points, m, j, L₁₁, L₀₁, L₁₀, D, b)
-FiniteContinuousZernikeMode(N::Int, points::AbstractVector, m::Int, j::Int, L₁₁, L₀₁, L₁₀, D) = FiniteContinuousZernikeMode{Float64}(N, points, m, j, L₁₁, L₀₁, L₁₀, D, m+2N)
+# FiniteContinuousZernikeMode(N::Int, points::AbstractVector, m::Int, j::Int, L₁₁, L₀₁, L₁₀, D, b::Int) = FiniteContinuousZernikeMode{Float64}(N, points, m, j, L₁₁, L₀₁, L₁₀, D, b)
+# FiniteContinuousZernikeMode(N::Int, points::AbstractVector, m::Int, j::Int, L₁₁, L₀₁, L₁₀, D) = FiniteContinuousZernikeMode{Float64}(N, points, m, j, L₁₁, L₀₁, L₁₀, D, m+2N)
 
 function axes(Z::FiniteContinuousZernikeMode{T}) where T
     first(Z.points) ≈ 0 && return (Inclusion(last(Z.points)*UnitDisk{T}()), oneto(Z.N*(length(Z.points)-1)-(length(Z.points)-2)))
@@ -48,14 +48,18 @@ function axes(Z::FiniteContinuousZernikeMode{T}) where T
 end
 ==(P::FiniteContinuousZernikeMode, Q::FiniteContinuousZernikeMode) = P.N == Q.N && P.points == Q.points && P.m == Q.m && P.j == Q.j && P.b == Q.b
 
-function _getCs(F::FiniteContinuousZernikeMode)
-    points, m, j, b, = F.points, F.m, F.j, F.b
-    L₁₁, L₀₁, L₁₀, D = F.L₁₁, F.L₀₁, F.L₁₀, F.D 
+function _getCs(points::AbstractVector{T}, m::Int, j::Int, b::Int, L₁₁, L₀₁, L₁₀, D) where T
     K = length(points)-1
     first(points) > 0 && return [ContinuousZernikeAnnulusElementMode([points[k]; points[k+1]], m, j, L₁₁[k], L₀₁[k], L₁₀[k], D[k], b) for k in 1:K]
     
     error("Fix disk element.")
     append!(Any[ContinuousZernikeElementMode{T}([points[1]; points[2]], m, j)], [ContinuousZernikeAnnulusElementMode{T}([points[k]; points[k+1]], m, j, b) for k in 2:K])
+end
+
+function _getCs(F::FiniteContinuousZernikeMode)
+    points, m, j, b, = F.points, F.m, F.j, F.b
+    L₁₁, L₀₁, L₁₀, D = F.L₁₁, F.L₀₁, F.L₁₀, F.D
+    _getCs(points, m, j, b, L₁₁, L₀₁, L₁₀, D)
 end
 
 function _getγs(points::AbstractArray{T}, m::Int) where T
@@ -90,7 +94,6 @@ end
 function ldiv(F::FiniteContinuousZernikeMode{V}, f::AbstractQuasiVector) where V
     # T = promote_type(V, eltype(f))
 
-    @warn "Expanding via ZernikeAnnulus is ill-conditioned, are you sure you want to expand your function in this basis?"
     T = V
     points = T.(F.points); K = length(points)-1
     N = F.N; m = F.m; j = F.j;
@@ -172,32 +175,27 @@ end
 # Gradient for constructing weak Laplacian.
 ###
 
-struct GradientFiniteContinuousZernikeAnnulusMode{T, N<:Int, P<:AbstractVector, M<:Int, J<:Int, B<:Int}<:Basis{T}
-    N::N
-    points::P
-    m::M
-    j::J
-    b::B
+struct GradientFiniteContinuousZernikeAnnulusMode{T}<:Basis{T}
+    F::FiniteContinuousZernikeMode{T}
 end
 
-GradientFiniteContinuousZernikeAnnulusMode{T}(N::Int, points::AbstractVector, m::Int, j::Int, b::Int) where {T} =  GradientFiniteContinuousZernikeAnnulusMode{T,Int, typeof(points), Int, Int, Int}(N, points, m, j, b)
-GradientFiniteContinuousZernikeAnnulusMode(N::Int, points::AbstractVector, m::Int, j::Int, b::Int) =  GradientFiniteContinuousZernikeAnnulusMode{Float64}(N, points, m, j, b)
-GradientFiniteContinuousZernikeAnnulusMode(N::Int, points::AbstractVector, m::Int, j::Int) = GradientFiniteContinuousZernikeAnnulusMode{Float64}(N, points, m, j, m+2N)
+# GradientFiniteContinuousZernikeAnnulusMode(F::FiniteContinuousZernikeMode{T}) where T =  GradientFiniteContinuousZernikeAnnulusMode{T}(F)
 
-axes(Z:: GradientFiniteContinuousZernikeAnnulusMode) = (Inclusion(last(Z.points)*UnitDisk{eltype(Z)}()), oneto(Z.N*(length(Z.points)-1)-(length(Z.points)-2)))
-==(P:: GradientFiniteContinuousZernikeAnnulusMode, Q:: GradientFiniteContinuousZernikeAnnulusMode) = P.points == Q.points && P.m == Q.m && P.j == Q.j && P.b == Q.b
+axes(Z:: GradientFiniteContinuousZernikeAnnulusMode) = (Inclusion(last(Z.F.points)*UnitDisk{eltype(Z)}()), oneto(Z.F.N*(length(Z.F.points)-1)-(length(Z.F.points)-2)))
+==(P::GradientFiniteContinuousZernikeAnnulusMode, Q::GradientFiniteContinuousZernikeAnnulusMode) = P.F.points == Q.F.points && P.F.m == Q.F.m && P.F.j == Q.F.j && P.F.b == Q.F.b
 
-@simplify function *(D::Derivative, C::FiniteContinuousZernikeMode)
-    GradientFiniteContinuousZernikeAnnulusMode(C.N, C.points, C.m, C.j, C.b)
+@simplify function *(D::Derivative, F::FiniteContinuousZernikeMode)
+    GradientFiniteContinuousZernikeAnnulusMode(F)
 end
 
 @simplify function *(A::QuasiAdjoint{<:Any,<:GradientFiniteContinuousZernikeAnnulusMode}, B::GradientFiniteContinuousZernikeAnnulusMode)
     T = promote_type(eltype(A), eltype(B))
     @assert A' == B
+    F = B.F
 
-    points = T.(B.points); K = length(points)-1
-    N = B.N; m = B.m; j = B.j;
-    Cs = _getCs(B)
+    points = T.(F.points); K = length(points)-1
+    N = F.N; m = F.m; j = F.j;
+    Cs = _getCs(F)
     
     xs = [axes(C,1) for C in Cs]
     Ds = [Derivative(x) for x in xs]

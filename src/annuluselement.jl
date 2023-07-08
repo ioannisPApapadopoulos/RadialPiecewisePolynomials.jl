@@ -69,8 +69,8 @@ function ContinuousZernikeAnnulusElementMode(points::AbstractVector{T}, m::Int, 
     ContinuousZernikeAnnulusElementMode(points, m, j, L₁₁, L₀₁, L₁₀, D, 200) 
 end
 
-ContinuousZernikeAnnulusElementMode(points::AbstractVector, m::Int, j::Int, L₁₁::AbstractMatrix, L₀₁::AbstractMatrix, L₁₀::AbstractMatrix, D::AbstractMatrix, b::Int) = ContinuousZernikeAnnulusElementMode{Float64}(points, m, j, L₁₁, L₀₁, L₁₀, D, b)
-ContinuousZernikeAnnulusElementMode(points::AbstractVector, m::Int, j::Int, L₁₁::AbstractMatrix, L₀₁::AbstractMatrix, L₁₀::AbstractMatrix, D::AbstractMatrix) = ContinuousZernikeAnnulusElementMode(points, m, j, L₁₁, L₀₁, L₁₀, D, 200)
+# ContinuousZernikeAnnulusElementMode(points::AbstractVector, m::Int, j::Int, L₁₁::AbstractMatrix, L₀₁::AbstractMatrix, L₁₀::AbstractMatrix, D::AbstractMatrix, b::Int) = ContinuousZernikeAnnulusElementMode{Float64}(points, m, j, L₁₁, L₀₁, L₁₀, D, b)
+# ContinuousZernikeAnnulusElementMode(points::AbstractVector, m::Int, j::Int, L₁₁::AbstractMatrix, L₀₁::AbstractMatrix, L₁₀::AbstractMatrix, D::AbstractMatrix) = ContinuousZernikeAnnulusElementMode(points, m, j, L₁₁, L₀₁, L₁₀, D, 200)
 
 axes(Z::ContinuousZernikeAnnulusElementMode) = (Inclusion(annulus(first(Z.points), last(Z.points))), oneto(∞))
 ==(P::ContinuousZernikeAnnulusElementMode, Q::ContinuousZernikeAnnulusElementMode) = P.points == Q.points && P.m == Q.m && P.j == Q.j
@@ -116,8 +116,6 @@ end
 
 function ldiv(C::ContinuousZernikeAnnulusElementMode{T}, f::AbstractQuasiVector) where T
     # T = promote_type(V, eltype(f))
-
-    @warn "Expanding via ZernikeAnnulus is ill-conditioned, are you sure you want to expand your function in this basis?"
 
     α, β = convert(T, first(C.points)), convert(T, last(C.points))
     ρ = α / β
@@ -168,7 +166,7 @@ end
     m = B.m
 
     t = inv(one(T)-ρ^2)
-    L₁₁, L₀₁, L₁₀ = C.L₁₁, C.L₀₁, C.L₁₀
+    L₁₁, L₀₁, L₁₀ = B.L₁₁, B.L₀₁, B.L₁₀
 
     # Contribution from the mass matrix of harmonic polynomial
     m₀ = convert(T,π) / ( t^(one(T) + m) )
@@ -233,21 +231,19 @@ effectively a placeholder for the actual implementation of the gradient of Zerni
 For now we use it as a intermediate to compute the weak Laplacian matrix. 
 """
 
-struct GradientContinuousZernikeAnnulusElementMode{T, P<:AbstractVector, M<:Int, J<:Int}<:Basis{T}
-    points::P
-    m::M
-    j::J
+struct GradientContinuousZernikeAnnulusElementMode{T}<:Basis{T}
+    C::ContinuousZernikeAnnulusElementMode{T}
 end
 
-GradientContinuousZernikeAnnulusElementMode{T}(points::AbstractVector, m::Int, j::Int) where {T} =  GradientContinuousZernikeAnnulusElementMode{T,typeof(points), Int, Int}(points, m, j)
-GradientContinuousZernikeAnnulusElementMode(points::AbstractVector, m::Int, j::Int) =  GradientContinuousZernikeAnnulusElementMode{Float64}(points, m, j)
-GradientContinuousZernikeAnnulusElementMode(m::Int, j::Int) =  GradientContinuousZernikeAnnulusElementMode([0.0; 1.0], m, j)
+# GradientContinuousZernikeAnnulusElementMode{T}(points::AbstractVector, m::Int, j::Int) where {T} =  GradientContinuousZernikeAnnulusElementMode{T,typeof(points), Int, Int}(points, m, j)
+# GradientContinuousZernikeAnnulusElementMode(points::AbstractVector, m::Int, j::Int) =  GradientContinuousZernikeAnnulusElementMode{Float64}(points, m, j)
+# GradientContinuousZernikeAnnulusElementMode(m::Int, j::Int) =  GradientContinuousZernikeAnnulusElementMode([0.0; 1.0], m, j)
 
-axes(Z:: GradientContinuousZernikeAnnulusElementMode) = (Inclusion(last(Z.points)*UnitDisk{eltype(Z)}()), oneto(∞))
-==(P:: GradientContinuousZernikeAnnulusElementMode, Q:: GradientContinuousZernikeAnnulusElementMode) = P.points == Q.points && P.m == Q.m && P.j == Q.j
+axes(Z::GradientContinuousZernikeAnnulusElementMode) = (Inclusion(last(Z.C.points)*UnitDisk{eltype(Z)}()), oneto(∞))
+==(P::GradientContinuousZernikeAnnulusElementMode, Q::GradientContinuousZernikeAnnulusElementMode) = P.C.points == Q.C.points && P.C.m == Q.C.m && P.C.j == Q.C.j
 
 @simplify function *(D::Derivative, C::ContinuousZernikeAnnulusElementMode)
-    GradientContinuousZernikeAnnulusElementMode(C.points, C.m, C.j)
+    GradientContinuousZernikeAnnulusElementMode(C)
 end
 
 
@@ -273,9 +269,9 @@ end
 
 @simplify function *(A::QuasiAdjoint{<:Any,<:GradientContinuousZernikeAnnulusElementMode}, B::GradientContinuousZernikeAnnulusElementMode)
     T = promote_type(eltype(A), eltype(B))
-    α, β = convert(T, first(B.points)), convert(T, last(B.points))
+    α, β = convert(T, first(B.C.points)), convert(T, last(B.C.points))
     ρ = α / β
-    m = B.m
+    m = B.C.m
     # # Scaling if outer radius is β instead of 1.
     # s = inv(( (one(T)- ρ) / (β - ρ) )^2)
     
@@ -285,7 +281,7 @@ end
     m₀ = convert(T,π) / ( t^(3 + m) ) * jw
     m₀ = m == 0 ? m₀ : m₀ / T(2)
 
-    Δ = - m₀ * C.D
+    Δ = - m₀ * B.C.D
     if m == 0
         c = convert(T,2π)*(T(1) - ρ^4)
         C = [c -c 4*m₀*(m+1); -c c -4*m₀*(m+1)]
