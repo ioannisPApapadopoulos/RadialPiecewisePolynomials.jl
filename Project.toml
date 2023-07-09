@@ -21,9 +21,6 @@ SemiclassicalOrthogonalPolynomials = "291c01f3-23f6-4eb6-aeb0-063a639b53f2"
 SpecialFunctions = "276daf66-3868-5448-9aa4-cd146d93841b"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 
-[compat]
-julia = "1.9"
-
 [extras]
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
