@@ -11,7 +11,9 @@ annulus(ρ::T, r::T) where T = (r*UnitDisk{T}()) \ (ρ*UnitDisk{T}())
 # ClassicalOrthogonalPolynomials.checkpoints(d::DomainSets.SetdiffDomain{SVector{2, T}, Tuple{DomainSets.EuclideanUnitBall{2, T, :closed}, DomainSets.GenericBall{SVector{2, T}, :closed, T}}}) where T = [SVector{2,T}(cos(0.1),sin(0.1)), SVector{2,T}(cos(0.2),sin(0.2))]
 
 # Matrices for lowering to ZernikeAnnulus(1,1) via
-# the Jacobi matrix. Stable, but probably higher complexity.
+# the Jacobi matrix. Stable, but probably higher complexity
+# and cannot be used for L2 inner-product of FiniteZernikeBasis
+# and FiniteContinuousZernike
 function _ann2element_via_Jacobi(t::T, m::Int) where T
     Q₁₁ = SemiclassicalJacobi{T}(t, 1, 1, m)
     
@@ -62,7 +64,7 @@ function ContinuousZernikeAnnulusElementMode(points::AbstractVector{T}, m::Int, 
     α, β = convert(T, first(points)), convert(T, last(points))
     ρ = α / β
     t = inv(one(T)-ρ^2)
-    (L₁₁, L₀₁, L₁₀) = _ann2element_via_Jacobi(t, m)
+    (L₁₁, L₀₁, L₁₀) = _ann2element_via_lowering(t, m)
     Z = ZernikeAnnulus{T}(ρ,1,1)
     D = (Z \ (Laplacian(axes(Z,1))*Weighted(Z))).ops[m+1]
 
@@ -120,7 +122,8 @@ function ldiv(C::ContinuousZernikeAnnulusElementMode{T}, f::AbstractQuasiVector)
     α, β = convert(T, first(C.points)), convert(T, last(C.points))
     ρ = α / β
     m, j = C.m, C.j
-    Z = ZernikeAnnulus{T}(ρ, one(T), one(T))
+    Z = ZernikeAnnulus{T}(ρ, zero(T), zero(T)) # via lowering
+    # Z = ZernikeAnnulus{T}(ρ, one(T), one(T))   # via Jacobi
     x = axes(Z,1)
     # # Need to take into account different scalings
     if β ≉  1
@@ -148,6 +151,7 @@ function ldiv(C::ContinuousZernikeAnnulusElementMode{T}, f::AbstractQuasiVector)
     pad(append!(cfs, dat), axes(C,2))
 end
 
+
 ###
 # L2 inner product
 ###
@@ -156,6 +160,35 @@ function _sum_semiclassicaljacobiweight(t::T, a::Number, b::Number, c::Number) w
     (t,a,b,c) = map(big, map(float, (t,a,b,c)))
     return convert(T, t^c * beta(1+a,1+b) * _₂F₁general2(1+a,-c,2+a+b,1/t))
 end
+
+# @simplify function *(A::QuasiAdjoint{<:Any,<:ContinuousZernikeAnnulusElementMode}, B::ContinuousZernikeAnnulusElementMode)
+#     T = promote_type(eltype(A), eltype(B))
+#     @assert A' == B
+
+#     α, β = convert(T, first(B.points)), convert(T, last(B.points))
+#     ρ = α / β
+#     m = B.m
+
+#     t = inv(one(T)-ρ^2)
+#     L₁₁, L₀₁, L₁₀ = B.L₁₁, B.L₀₁, B.L₁₀
+
+#     # Contribution from the mass matrix of harmonic polynomial
+#     m₀ = convert(T,π) / ( t^(one(T) + m) )
+#     m₀ = m == 0 ? m₀ : m₀ / T(2)
+    
+#     jw = _sum_semiclassicaljacobiweight(t,1,1,m) / t^2
+#     M = jw.*L₁₁
+#     a = jw.*L₁₀[1:2,1]
+#     b = jw.*L₀₁[1:2,1]
+    
+#     a11 = _sum_semiclassicaljacobiweight(t,2,0,m) / t^2
+#     a12 = jw
+#     a22 = _sum_semiclassicaljacobiweight(t,0,2,m) / t^2
+    
+#     C = [a11 a12 a'; a12 a22 b']
+#     M = Hcat(Vcat(C[1:2,3:4]', Zeros{T}(∞,2)), M)
+#     β^2*m₀*Vcat(Hcat(C, Zeros{T}(2,∞)), M)
+# end
 
 @simplify function *(A::QuasiAdjoint{<:Any,<:ContinuousZernikeAnnulusElementMode}, B::ContinuousZernikeAnnulusElementMode)
     T = promote_type(eltype(A), eltype(B))
@@ -169,53 +202,24 @@ end
     L₁₁, L₀₁, L₁₀ = B.L₁₁, B.L₀₁, B.L₁₀
 
     # Contribution from the mass matrix of harmonic polynomial
-    m₀ = convert(T,π) / ( t^(one(T) + m) )
+    jw = _sum_semiclassicaljacobiweight(t,0,0,m)
+    m₀ = convert(T,π) / ( t^(one(T) + m) ) * jw
     m₀ = m == 0 ? m₀ : m₀ / T(2)
     
-    jw = _sum_semiclassicaljacobiweight(t,1,1,m) / t^2
-    M = jw.*L₁₁
-    a = jw.*L₁₀[1:2,1]
-    b = jw.*L₀₁[1:2,1]
     
-    a11 = _sum_semiclassicaljacobiweight(t,2,0,m) / t^2
-    a12 = jw
-    a22 = _sum_semiclassicaljacobiweight(t,0,2,m) / t^2
+    M = L₁₁' *  L₁₁
+
+    a = ((L₁₁)'[1:2,:] * L₁₀[:,1])
+    b = ((L₁₁)'[1:2,:] * L₀₁[:,1])
+
+    a11 = ((L₁₀)'[1,:]' * L₁₀[:,1])
+    a12 = ((L₁₀)'[1,:]' * L₀₁[:,1])
+    a22 = ((L₀₁)'[1,:]' * L₀₁[:,1])
     
     C = [a11 a12 a'; a12 a22 b']
     M = Hcat(Vcat(C[1:2,3:4]', Zeros{T}(∞,2)), M)
     β^2*m₀*Vcat(Hcat(C, Zeros{T}(2,∞)), M)
 end
-
-# @simplify function *(A::QuasiAdjoint{<:Any,<:ContinuousZernikeAnnulusElementMode}, B::ContinuousZernikeAnnulusElementMode)
-#     T = promote_type(eltype(A), eltype(B))
-#     @assert A' == B
-
-#     α, β = convert(T, first(B.points)), convert(T, last(B.points))
-#     ρ = α / β
-#     m = B.m
-
-#     t = inv(one(T)-ρ^2)
-#     (L₁₁, L₀₁, L₁₀) = _ann2element_via_lowering(t, m)
-
-#     # Contribution from the mass matrix of harmonic polynomial
-#     jw = _sum_semiclassicaljacobiweight(t,0,0,m)
-#     m₀ = convert(T,π) / ( t^(one(T) + m) ) * jw
-#     m₀ = m == 0 ? m₀ : m₀ / T(2)
-    
-    
-#     M = L₁₁' *  L₁₁
-
-#     a = ((L₁₁)'[1:2,:] * L₁₀[:,1])
-#     b = ((L₁₁)'[1:2,:] * L₀₁[:,1])
-
-#     a11 = ((L₁₀)'[1,:]' * L₁₀[:,1])
-#     a12 = ((L₁₀)'[1,:]' * L₀₁[:,1])
-#     a22 = ((L₀₁)'[1,:]' * L₀₁[:,1])
-    
-#     C = [a11 a12 a'; a12 a22 b']
-#     M = Hcat(Vcat(C[1:2,3:4]', Zeros{T}(∞,2)), M)
-#     β^2*m₀*Vcat(Hcat(C, Zeros{T}(2,∞)), M)
-# end
 
 ###
 # Gradient and L2 inner product of gradient
@@ -298,7 +302,7 @@ end
 ###
 
 function grid(C::ContinuousZernikeAnnulusElementMode{T}, j::Int) where T
-    Z = ZernikeAnnulus{T}(C.points[1]/C.points[2], one(T), one(T))
+    Z = ZernikeAnnulus{T}(C.points[1]/C.points[2], zero(T), zero(T))
     AlgebraicCurveOrthogonalPolynomials.grid(Z, Block(j+C.m))
 end
 
@@ -316,7 +320,7 @@ function bubble2ann(C::ContinuousZernikeAnnulusElementMode, c::AbstractVector{T}
     if c isa LazyArray
         c = paddeddata(c)
     end
-    R̃[1:length(c), 1:length(c)] * c # coefficients for ZernikeAnnulus(ρ,1,1)
+    R̃[1:length(c), 1:length(c)] * c # coefficients for ZernikeAnnulus(ρ,0,0)
 end
 
 function plotvalues(u::ApplyQuasiVector{T,typeof(*),<:Tuple{ContinuousZernikeAnnulusElementMode, AbstractVector}}) where T
@@ -343,7 +347,7 @@ function plotvalues(u::ApplyQuasiVector{T,typeof(*),<:Tuple{ContinuousZernikeAnn
     g = scalegrid(grid(C, N), α, β)
 
     # Use fast transforms for synthesis
-    FT = ZernikeAnnulusITransform{T}(N+C.m, 1, 1, 0, ρ)
+    FT = ZernikeAnnulusITransform{T}(N+C.m, 0, 0, 0, ρ)
     g, FT * pad(F,blockedrange(oneto(∞)))[Block.(OneTo(N+C.m))]
 end
 

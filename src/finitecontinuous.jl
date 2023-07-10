@@ -16,6 +16,10 @@ end
 ==(P::FiniteContinuousZernike, Q::FiniteContinuousZernike) = P.N == Q.N && P.points == Q.points
 
 
+# Matrices for lowering to ZernikeAnnulus(1,1) via
+# the Jacobi matrix. Stable, but probably higher complexity
+# and cannot be used for L2 inner-product of FiniteZernikeBasis
+# and FiniteContinuousZernike
 function _ann2element_via_Jacobi(t::T) where T
     Q₁₁ = SemiclassicalJacobi{T}.(t, 1, 1, 0:∞)
     X = jacobimatrix.(Q₁₁)
@@ -23,6 +27,21 @@ function _ann2element_via_Jacobi(t::T) where T
     L₁₁ = (X .- X .* X)/t^2
     L₀₁ = (Fill(I, ∞) .- X)/t
     L₁₀ = X/t
+
+    (L₁₁, L₀₁, L₁₀)
+end
+
+# Matrices for lowering to ZernikeAnnulus(0,0) via
+# direct lowering. Less stable, but probably lower complexity.
+function _ann2element_via_lowering(t::T) where T
+    Q₀₀ = SemiclassicalJacobi{T}.(t, 0, 0, 0:∞)
+    Q₀₁ = SemiclassicalJacobi{T}.(t, 0, 1, 0:∞)
+    Q₁₀ = SemiclassicalJacobi{T}.(t, 1, 0, 0:∞)
+    Q₁₁ = SemiclassicalJacobi{T}.(t, 1, 1, 0:∞)
+
+    L₁₁ = (Weighted.(Q₀₀) .\ Weighted.(Q₁₁)) / t^2
+    L₀₁ = (Weighted.(Q₀₀) .\ Weighted.(Q₀₁)) / t
+    L₁₀ = (Weighted.(Q₀₀) .\ Weighted.(Q₁₀)) / t
 
     (L₁₁, L₀₁, L₁₀)
 end
@@ -46,7 +65,7 @@ function _getFs(N::Int, points::AbstractVector{T}) where T
 
     # Use broadcast notation to compute all the lowering matrices across all
     # intervals and Fourier modes simultaneously.
-    Ls = _ann2element_via_Jacobi.(ts)
+    Ls = _ann2element_via_lowering.(ts)
 
     # Use broadcast notation to compute all the derivative matrices across
     # all the intervals and Fourier modes simultaneously
@@ -74,7 +93,7 @@ _getFs(F::FiniteContinuousZernike{T}) where T = _getFs(F.N, F.points)
 
 function ldiv(F::FiniteContinuousZernike{V}, f::AbstractQuasiVector) where V
     # T = promote_type(V, eltype(f))
-    @warn "Expanding via FiniteContinuousZernike is ill-conditioned, are you sure you want to expand your function in this basis?"
+    @warn "Expanding via FiniteContinuousZernike is ill-conditioned, please use FiniteZernikeBasis."
     T = V
     N = F.N; points = T.(F.points)
 
@@ -94,12 +113,6 @@ end
     Fs = _getFs(N, points)
     [F' * F for F in Fs]
 end
-
-
-@simplify function *(A::QuasiAdjoint{<:Any,<:ZernikeAnnulus}, B::FiniteContinuousZernike)
-    return 2.0
-end
-
 
 ###
 # Gradient for constructing weak Laplacian.
@@ -140,7 +153,8 @@ end
 # This helper function takes the list of coefficient values from ldiv and converts them into 
 # a 3-tensor of degree × Fourier mode × element. Us is the hat/bubble coeffiecients
 # and Ũs are the corresponding ZernikeAnnulus(ρ,1,1) coefficients.
-function _bubble2disk_or_ann_all_modes(F::FiniteContinuousZernike{T}, us::AbstractVector) where T
+function _bubble2disk_or_ann_all_modes(F::FiniteContinuousZernike, us::AbstractVector)
+    T = eltype(F)
     points = T.(F.points); K = length(points)-1
     N = F.N;
     ms = ((0:2N) .÷ 2)[2:end-1]
@@ -183,7 +197,8 @@ function _bubble2disk_or_ann_all_modes(F::FiniteContinuousZernike{T}, us::Abstra
 end
 
 
-function finite_plotvalues(F::FiniteContinuousZernike{T}, us::AbstractVector) where T
+function finite_plotvalues(F::FiniteContinuousZernike, us::AbstractVector)
+    T = eltype(F)
     _, Ũs = _bubble2disk_or_ann_all_modes(F, us)
     points = T.(F.points); N = F.N; K = length(points)-1
     θs=[]; rs=[]; vals = []   
@@ -197,11 +212,11 @@ function finite_plotvalues(F::FiniteContinuousZernike{T}, us::AbstractVector) wh
         else
             α, β = points[k], points[k+1]
             ρ = α / β
-            Z = ZernikeAnnulus{T}(ρ, one(T), one(T))
+            Z = ZernikeAnnulus{T}(ρ, zero(T), zero(T))
             # Scale the grid
             g = scalegrid(AlgebraicCurveOrthogonalPolynomials.grid(Z, Block(N)), α, β)
             # Use fast transforms for synthesis
-            FT = ZernikeAnnulusITransform{T}(N, 1, 1, 0, ρ)
+            FT = ZernikeAnnulusITransform{T}(N, 0, 0, 0, ρ)
             val = FT * pad(ModalTrav(Ũs[:,:,k]),axes(Z,2))[Block.(OneTo(N))]
         end
         (θ, r, val) = plot_helper(g, val)

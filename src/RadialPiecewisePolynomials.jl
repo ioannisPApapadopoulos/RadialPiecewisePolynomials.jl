@@ -1,7 +1,7 @@
 module RadialPiecewisePolynomials
 
 using AlgebraicCurveOrthogonalPolynomials, ClassicalOrthogonalPolynomials, ContinuumArrays, DomainSets,
-    FastTransforms, ForwardDiff, LinearAlgebra, MultivariateOrthogonalPolynomials, SemiclassicalOrthogonalPolynomials,
+    FastTransforms, LinearAlgebra, MultivariateOrthogonalPolynomials, SemiclassicalOrthogonalPolynomials,
     StaticArrays, QuasiArrays, FillArrays, LazyArrays, Memoization #, ArrayLayouts#, LazyBandedMatrices#, 
 
 

@@ -27,7 +27,7 @@ function FiniteContinuousZernikeMode(N::Int, points::AbstractVector{T}, m::Int, 
     end
 
     ts = inv.(one(T) .- ρs.^2)
-    Ls = _ann2element_via_Jacobi.(ts, m)
+    Ls = _ann2element_via_lowering.(ts, m)
     L₁₁ = NTuple{K, AbstractMatrix}(first.(Ls))
     L₀₁ = NTuple{K, AbstractMatrix}([Ls[k][2] for k in 1:K])
     L₁₀ = NTuple{K, AbstractMatrix}(last.(Ls))

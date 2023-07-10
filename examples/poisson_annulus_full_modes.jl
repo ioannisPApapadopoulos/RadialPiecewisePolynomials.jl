@@ -1,5 +1,6 @@
 using Revise, RadialPiecewisePolynomials
 using PyPlot
+using ForwardDiff
 import ForwardDiff: derivative
 include("../src/plots.jl") # Helper functions for plotting (do not want to compile PyPlot with RadialPiecewisePolynomials)
 
