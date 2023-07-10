@@ -115,14 +115,15 @@ end
 ###
 # L2 inner product
 ###
-function _piece_element_matrix(Ms, N::Int, K::Int, m::Int, points::AbstractVector{T}) where T
-    M = Hcat(Matrix(Ms[1][1:N, 1:N]), zeros(N,(K-1)*(N-1)))
+function _piece_element_matrix(Ms, N::Int, m::Int, points::AbstractVector{T}) where T
+    K = length(points)-1
+    M = Hcat(Matrix{T}(Ms[1][1:N, 1:N]), zeros(N,(K-1)*(N-1)))
 
     if K > 1
         γs = _getγs(points, m)
         append!(γs, one(T))
         for k in 2:K
-            M = Matrix(Vcat(M, Hcat(zeros(N-1, N+(k-2)*(N-1)), Ms[k][2:N, 2:N], zeros(N-1, (K-k)*(N-1)))))
+            M = Matrix(Vcat(M, Hcat(zeros(T, N-1, N+(k-2)*(N-1)), Ms[k][2:N, 2:N], zeros(T, N-1, (K-k)*(N-1)))))
         end
 
         i = first(points) ≈ 0 ? 1 : 2 # disk or annulus?
@@ -162,13 +163,13 @@ end
     T = promote_type(eltype(A), eltype(B))
     @assert A' == B
 
-    points = T.(B.points); K = length(points)-1
+    points = T.(B.points)
     N = B.N; m = B.m;
     Cs = _getCs(B)
 
     Ms = [C' * C for C in Cs]
 
-    _piece_element_matrix(Ms, N, K, m, points)
+    _piece_element_matrix(Ms, N, m, points)
 end
 
 ###
@@ -193,7 +194,7 @@ end
     @assert A' == B
     F = B.F
 
-    points = T.(F.points); K = length(points)-1
+    points = T.(F.points)
     N = F.N; m = F.m; j = F.j;
     Cs = _getCs(F)
     
@@ -201,7 +202,7 @@ end
     Ds = [Derivative(x) for x in xs]
     Δs = [(D*C)' * (D*C) for (C, D) in zip(Cs, Ds)]
 
-    return _piece_element_matrix(Δs, N, K, m, points)
+    return _piece_element_matrix(Δs, N, m, points)
 end
 
 function zero_dirichlet_bcs!(F::FiniteContinuousZernikeMode{T}, Δ::AbstractMatrix{T}, Mf::AbstractVector{T}) where T

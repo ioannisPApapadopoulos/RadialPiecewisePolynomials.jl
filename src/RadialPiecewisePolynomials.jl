@@ -22,7 +22,7 @@ export SVector, Zeros, Ones, Vcat, Derivative, pad, paddeddata, Hcat, RadialCoor
         zero_dirichlet_bcs!, element_plotvalues,
         finite_plotvalues, inf_error, plot,
         FiniteContinuousZernikeMode, FiniteContinuousZernike,
-        FiniteZernikeBasis
+        FiniteZernikeBasis, ZernikeBasisMode, FiniteZernikeBasisMode
 
 include("diskelement.jl")
 include("annuluselement.jl")

@@ -46,12 +46,15 @@ function _ann2element_via_lowering(t::T) where T
     (L₁₁, L₀₁, L₁₀)
 end
 
-function _getFs(N::Int, points::AbstractVector{T}) where T
-    # Ordered list of Fourier modes (ms, js) and correct length for each Fourier mode Ms.
+function _getMs_ms_js(N::Int)
     ms = ((0:2N) .÷ 2)[2:end-1]
     js = repeat([0; 1], N)[2:end]
-    Ms = ((N + 1 .- ms) .÷ 2); Ms[Ms .== 1] .= 2
-
+    Ms = ((N + 1 .- ms) .÷ 2); Ms[Ms .<= 2] .= 3
+    (Ms, ms, js)
+end
+function _getFs(N::Int, points::AbstractVector{T}) where T
+    # Ordered list of Fourier modes (ms, js) and correct length for each Fourier mode Ms.
+    Ms, ms, js = _getMs_ms_js(N)
     K = length(points)-1
 
     # List of radii of the annuli
@@ -157,8 +160,7 @@ function _bubble2disk_or_ann_all_modes(F::FiniteContinuousZernike, us::AbstractV
     T = eltype(F)
     points = T.(F.points); K = length(points)-1
     N = F.N;
-    ms = ((0:2N) .÷ 2)[2:end-1]
-    Ms = ((N + 1 .- ms) .÷ 2); Ms[Ms .== 1] .= 2
+    Ms, ms, _ = _getMs_ms_js(N)
 
     Ñ = isodd(N) ? N : N+1
     Us = zeros(T,(Ñ+1)÷2,2Ñ-1,K)

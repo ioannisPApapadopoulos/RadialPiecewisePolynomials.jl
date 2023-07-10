@@ -14,6 +14,10 @@ function ZernikeBasisMode(points::AbstractVector{T}, a::Int, b::Int, m::Int, j::
     ZernikeBasisMode{T, Vector{T}}(points, a, b, m, j)
 end
 
+axes(Z::ZernikeBasisMode) = (Inclusion(annulus(first(Z.points), last(Z.points))), oneto(∞))
+==(P::ZernikeBasisMode, Q::ZernikeBasisMode) = P.points == Q.points && P.m == Q.m && P.j == Q.j && P.a == Q.a && P.b == Q.b
+
+
 # The Zernike (annular) basis on multiple elements and single Fourier mode
 struct FiniteZernikeBasisMode{T, P<:AbstractArray{T}} <: Basis{T}
     N::Int
@@ -28,6 +32,24 @@ function FiniteZernikeBasisMode(N::Int, points::AbstractVector{T}, a::Int, b::In
     @assert m ≥ 0
     @assert m == 0 ? j == 1 : 0 ≤ j ≤ 1
     FiniteZernikeBasisMode{T, Vector{T}}(N, points, a, b, m, j)
+end
+
+function axes(Z::FiniteZernikeBasisMode{T}) where T
+    first(Z.points) ≈ 0 && return (Inclusion(last(Z.points)*UnitDisk{T}()), oneto(Z.N*(length(Z.points)-1)))
+    (Inclusion(annulus(first(Z.points), last(Z.points))), oneto(Z.N*(length(Z.points)-1)))
+end
+==(P::FiniteZernikeBasisMode, Q::FiniteZernikeBasisMode) = P.N == Q.N && P.points == Q.points && P.m == Q.m && P.j == Q.j && P.a == Q.a && P.b == Q.b
+
+
+function _getZs(points::AbstractVector{T}, a::Int, b::Int, m::Int, j::Int) where T
+    K = length(points)-1
+    first(points) > 0 && return [ZernikeBasisMode([points[k]; points[k+1]], a, b, m, j) for k in 1:K]
+
+    error("Fix disk element.")
+end
+function _getZs(F::FiniteZernikeBasisMode)
+    points, a, b, m, j = F.points, F.a, F.b, F.m, F.j
+    _getZs(points, a, b, m, j)
 end
 
 # The Zernike (annular) basis on multiple elements and all Fourier modes
@@ -56,11 +78,29 @@ function FiniteZernikeBasis(N::Int, points::AbstractVector{T}, a::Int, b::Int) w
 end
 
 function axes(Z::FiniteZernikeBasis{T}) where T
-    first(Z.points) ≈ 0 && return (Inclusion(last(Z.points)*UnitDisk{T}()), oneto(Z.N*(length(Z.points)-1)-(length(Z.points)-2)))
-    (Inclusion(annulus(first(Z.points), last(Z.points))), oneto(Z.N*(length(Z.points)-1)-(length(Z.points)-2)))
+    first(Z.points) ≈ 0 && return (Inclusion(last(Z.points)*UnitDisk{T}()), oneto(Z.N*(length(Z.points)-1)))
+    (Inclusion(annulus(first(Z.points), last(Z.points))), oneto(Z.N*(length(Z.points)-1)))
 end
 ==(P::FiniteZernikeBasis, Q::FiniteZernikeBasis) = P.N == Q.N && P.points == Q.points
 
+function _getFZs(N::Int, points::AbstractArray{T}, a::Int, b::Int) where T
+    # Ordered list of Fourier modes (ms, js) and correct length for each Fourier mode Ms.
+    Ms, ms, js = _getMs_ms_js(N)
+
+    # Loop over the Fourier modes
+    Fs = []
+    for (M, m, j) in zip(Ms, ms, js)
+        # Construct the structs for each Fourier mode seperately
+        append!(Fs, [FiniteZernikeBasisMode(M, points, a, b, m, j)])
+    end
+    return Fs
+end
+
+_getFZs(Z::FiniteZernikeBasis{T}) where T = _getFZs(Z.N, Z.points, Z.a, Z.b)
+
+####
+# Transforms (analysis)
+####
 function ldiv(Z::FiniteZernikeBasis{T}, f::AbstractQuasiVector) where T
 
     N, points, Zs = Z.N, Z.points, Z.Zs
@@ -79,8 +119,7 @@ function ldiv(Z::FiniteZernikeBasis{T}, f::AbstractQuasiVector) where T
     c = ModalTrav.(c)
     cs = Vector{T}[]
     
-    ms = ((0:2N) .÷ 2)[2:end-1]
-    Ms = ((N + 1 .- ms) .÷ 2); Ms[Ms .== 1] .= 2
+    Ms, ms, js = _getMs_ms_js(N)
 
     for i in 1:2N-1
         u = T[]
@@ -96,6 +135,34 @@ end
 # L2 inner product matrices
 ####
 
+function _piece_element_matrix_zernike_basis(Ms, N::Int, m::Int, points::AbstractVector{T}) where T
+    K = length(points)-1
+    M = Hcat(Matrix{T}(Ms[1][1:N, 1:N]), zeros(T, N,(K-1)*N))
+
+    if K > 1
+        γs = _getγs(points, m)
+        append!(γs, one(T))
+        for k in 2:K
+            M = Matrix(Vcat(M, Hcat(zeros(T, N-1, N+(k-2)*(N)), Ms[k][2:N, 1:N], zeros(T, N-1, (K-k)*(N)))))
+        end
+
+        i = first(points) ≈ 0 ? 1 : 2 # disk or annulus?
+        M[i, 1:i] *= γs[1] # Convert the left-side hat function coefficients for continuity
+
+        # Right-side of hat function interaction with basis in next element
+        M[i, N+1:N+2] = Ms[2][1,1:2]
+
+        b = min(N, 2)
+        for k in 2:K-1
+            # Convert left-side of hat function coefficients for continuity
+            M[N+(k-2)*(N-1)+1, (k-1)*(N)+1:(k-1)*(N)+b] *= γs[k]
+            # Right-side of hat function interaction with basis in next element
+            M[N+(k-2)*(N-1)+1, (k)*(N)+1:(k)*(N)+b] = Ms[k+1][1,1:2]
+        end
+    end
+    return M
+end
+
 @simplify function *(FT::QuasiAdjoint{<:Any,<:ContinuousZernikeAnnulusElementMode}, Z::ZernikeBasisMode)
     T = promote_type(eltype(FT), eltype(Z))
     F = FT.parent
@@ -106,35 +173,46 @@ end
     α, β = first(points), last(points)
     ρ = α / β
     t = inv(one(T)-ρ^2)
+    L₁₁, L₀₁, L₁₀ = F.L₁₁, F.L₀₁, F.L₁₀
 
-    if a == 1 && b == 1
+    if a == 0 && b == 0
         # Contribution from the mass matrix of harmonic polynomial
-        m₀ = convert(T,π) / ( t^(one(T) + m) )
+        jw = _sum_semiclassicaljacobiweight(t,0,0,m)
+        m₀ = convert(T,π) / ( t^(one(T) + m) ) * jw
         m₀ = m == 0 ? m₀ : m₀ / T(2)
-        
+        Vcat(Hcat(β^2*m₀*L₁₀[:,1], β^2*m₀*L₀₁[:,1])', β^2*m₀*L₁₁')
     else
-        error("L²-inner product not implemented for parameters Z.a = $a and Z.b = $b")
+        error("L²-inner product between ContinuousZernikeAnnulusElementMode and ZernikeBasisMode not implemented for parameters Z.a = $a and Z.b = $b")
     end
 end
 
-@simplify function *(FT::QuasiAdjoint{<:Any,<:FiniteContinuousZernike}, Z::FiniteZernikeBasis)
+@simplify function *(FT::QuasiAdjoint{<:Any,<:FiniteContinuousZernikeMode}, Z::FiniteZernikeBasisMode)
     T = promote_type(eltype(FT), eltype(Z))
     F = FT.parent
 
-    @assert F.N == Z.N && F.points == Z.points
+    @assert F.N == Z.N && F.points == Z.points && F.m == Z.m && F.j == Z.j
 
-    N, points, a, b = Z.N, Z.points, Z.a, Z.b
+    N, points, m = Z.N, T.(Z.points), Z.m
+    K = length(points)-1
+    Cs = _getCs(F)
+    Zs = _getZs(Z)
+    Ms = [C' * Z̃ for (C, Z̃) in zip(Cs, Zs)]
 
+    _piece_element_matrix_zernike_basis(Ms, N, m, points)
 
-    if a == 1 && b == 1
-        error("L²-inner product not implemented for parameters Z.a = $a and Z.b = $b")
-    elseif a == 0 && b == 0
-        error("L²-inner product not implemented for parameters Z.a = $a and Z.b = $b")
-    else
-        error("L²-inner product not implemented for parameters Z.a = $a and Z.b = $b")
-    end
 end
 
+@simplify function *(FT::QuasiAdjoint{<:Any,<:FiniteContinuousZernike}, Z::FiniteZernikeBasis)
+        T = promote_type(eltype(FT), eltype(Z))
+        F = FT.parent
+        @assert F.N == Z.N && F.points == Z.points
+
+        N, points = Z.N, T.(Z.points);
+        Fs = _getFs(N, points)
+        Zs = _getFZs(N, points, Z.a, Z.b)
+
+        [F̃' * Z̃ for (F̃, Z̃) in zip(Fs, Zs)]
+end
 
 
 ###
@@ -146,8 +224,7 @@ end
 function _bubble2disk_or_ann_all_modes(Z::FiniteZernikeBasis{T}, us::AbstractVector) where T
     points = T.(Z.points); K = length(points)-1
     N = Z.N;
-    ms = ((0:2N) .÷ 2)[2:end-1]
-    Ms = ((N + 1 .- ms) .÷ 2); Ms[Ms .== 1] .= 2
+    Ms, _, _ = _getMs_ms_js(N)
 
     Ñ = isodd(N) ? N : N+1
     Us = zeros(T,(Ñ+1)÷2,2Ñ-1,K)
