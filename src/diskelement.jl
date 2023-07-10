@@ -1,19 +1,19 @@
 ClassicalOrthogonalPolynomials.checkpoints(d::DomainSets.GenericBall{SVector{2, T}, :closed, T}) where T = [SVector{2,T}(cos(0.1),sin(0.1)), SVector{2,T}(cos(0.2),sin(0.2))]
 
-struct ContinuousZernikeElementMode{T, P<:AbstractVector, M<:Int, J<:Int} <: Basis{T}
+struct ContinuousZernikeElementMode{T, P<:AbstractVector} <: Basis{T}
     points::P
-    m::M
-    j::J
+    m::Int
+    j::Int
 end
 
-function ContinuousZernikeElementMode{T}(points::AbstractVector, m::Int, j::Int) where {T}
+function ContinuousZernikeElementMode(points::AbstractVector{T}, m::Int, j::Int) where {T}
     @assert length(points) == 2 && points[1] ≈ 0 && 0 < points[2]
     @assert m ≥ 0
     @assert m == 0 ? j == 1 : 0 ≤ j ≤ 1
-    ContinuousZernikeElementMode{T,typeof(points), Int, Int}(points, m, j)
+    ContinuousZernikeElementMode{T,typeof(points)}(points, m, j)
 end
-ContinuousZernikeElementMode(points::AbstractVector, m::Int, j::Int) = ContinuousZernikeElementMode{Float64}(points, m, j)
-ContinuousZernikeElementMode(m::Int, j::Int) = ContinuousZernikeElementMode([0.0; 1.0], m, j)
+# ContinuousZernikeElementMode(points::AbstractVector, m::Int, j::Int) = ContinuousZernikeElementMode{Float64}(points, m, j)
+# ContinuousZernikeElementMode(m::Int, j::Int) = ContinuousZernikeElementMode([0.0; 1.0], m, j)
 
 axes(Z::ContinuousZernikeElementMode) = (Inclusion(last(Z.points)*UnitDisk{eltype(Z)}()), oneto(∞))
 ==(P::ContinuousZernikeElementMode, Q::ContinuousZernikeElementMode) = P.points == Q.points && P.m == Q.m && P.j == Q.j
@@ -103,30 +103,29 @@ end
 ###
 # Gradient and L2 inner product of gradient
 ##
-struct GradientContinuousZernikeElementMode{T, P<:AbstractVector, M<:Int, J<:Int}<:Basis{T}
-    points::P
-    m::M
-    j::J
+struct GradientContinuousZernikeElementMode{T}<:Basis{T}
+    C::ContinuousZernikeElementMode{T}
 end
 
-GradientContinuousZernikeElementMode{T}(points::AbstractVector, m::Int, j::Int) where {T} =  GradientContinuousZernikeElementMode{T,typeof(points), Int, Int}(points, m, j)
-GradientContinuousZernikeElementMode(points::AbstractVector, m::Int, j::Int) =  GradientContinuousZernikeElementMode{Float64}(points, m, j)
-GradientContinuousZernikeElementMode(m::Int, j::Int) =  GradientContinuousZernikeElementMode([0.0; 1.0], m, j)
+# GradientContinuousZernikeElementMode{T}(points::AbstractVector, m::Int, j::Int) where {T} =  GradientContinuousZernikeElementMode{T,typeof(points), Int, Int}(points, m, j)
+# GradientContinuousZernikeElementMode(points::AbstractVector, m::Int, j::Int) =  GradientContinuousZernikeElementMode{Float64}(points, m, j)
+# GradientContinuousZernikeElementMode(m::Int, j::Int) =  GradientContinuousZernikeElementMode([0.0; 1.0], m, j)
 
-axes(Z:: GradientContinuousZernikeElementMode) = (Inclusion(last(Z.points)*UnitDisk{eltype(Z)}()), oneto(∞))
-==(P:: GradientContinuousZernikeElementMode, Q:: GradientContinuousZernikeElementMode) = P.points == Q.points && P.m == Q.m && P.j == Q.j
+axes(Z:: GradientContinuousZernikeElementMode) = (Inclusion(last(Z.C.points)*UnitDisk{eltype(Z)}()), oneto(∞))
+==(P::GradientContinuousZernikeElementMode, Q::GradientContinuousZernikeElementMode) = P.C == Q.C
 
 @simplify function *(D::Derivative, C::ContinuousZernikeElementMode)
-    GradientContinuousZernikeElementMode(C.points, C.m, C.j)
+    GradientContinuousZernikeElementMode(C)
 end
 
 @simplify function *(A::QuasiAdjoint{<:Any,<:GradientContinuousZernikeElementMode}, B::GradientContinuousZernikeElementMode)
     T = promote_type(eltype(A), eltype(B))
     Z = Zernike(0,1)
     D = Z \ (Laplacian(axes(Z,1))*Weighted(Z))
+    m = B.C.m
 
-    Δ = -D.ops[B.m+1]
-    cₘ = π*B.m*zerniker(B.m,B.m,0,1,one(T))^2 # = <Z^(0,1)_{m,m,j}, Z^(0,1)_{m,m,j}>_L^2
+    Δ = -D.ops[m+1]
+    cₘ = π*m*zerniker(m,m,0,1,one(T))^2 # = <Z^(0,1)_{m,m,j}, Z^(0,1)_{m,m,j}>_L^2
 
     Vcat([T[cₘ]; Zeros{T}(∞)]', [Zeros{T}(∞) Δ])
 end
