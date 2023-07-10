@@ -1,5 +1,8 @@
 ClassicalOrthogonalPolynomials.checkpoints(d::DomainSets.GenericBall{SVector{2, T}, :closed, T}) where T = [SVector{2,T}(cos(0.1),sin(0.1)), SVector{2,T}(cos(0.2),sin(0.2))]
 
+# I do not think it is faster to pass all the matrices for the disk element.
+# Much quicker to just repeatedly call Z0 \ Weighted(Z1)
+
 struct ContinuousZernikeElementMode{T, P<:AbstractVector} <: Basis{T}
     points::P
     m::Int
@@ -13,7 +16,7 @@ function ContinuousZernikeElementMode(points::AbstractVector{T}, m::Int, j::Int)
     ContinuousZernikeElementMode{T,typeof(points)}(points, m, j)
 end
 # ContinuousZernikeElementMode(points::AbstractVector, m::Int, j::Int) = ContinuousZernikeElementMode{Float64}(points, m, j)
-# ContinuousZernikeElementMode(m::Int, j::Int) = ContinuousZernikeElementMode([0.0; 1.0], m, j)
+ContinuousZernikeElementMode(m::Int, j::Int) = ContinuousZernikeElementMode([0.0; 1.0], m, j)
 
 axes(Z::ContinuousZernikeElementMode) = (Inclusion(last(Z.points)*UnitDisk{eltype(Z)}()), oneto(∞))
 ==(P::ContinuousZernikeElementMode, Q::ContinuousZernikeElementMode) = P.points == Q.points && P.m == Q.m && P.j == Q.j
@@ -21,15 +24,15 @@ axes(Z::ContinuousZernikeElementMode) = (Inclusion(last(Z.points)*UnitDisk{eltyp
 function getindex(Z::ContinuousZernikeElementMode{T}, xy::StaticVector{2}, j::Int)::T where {T}
     p = Z.points
     α, β = convert(T, p[1]), convert(T, p[2])
-    @assert α ≈ 0
+
     rθ = RadialCoordinate(xy)
     r̃ = affine(α.. β, 0.. 1)[rθ.r]
     xỹ = SVector(r̃*cos(rθ.θ), r̃*sin(rθ.θ))
-    Z.m == 0 && @assert Z.j == 1
+
     if j == 1
-        Zernike{T}(0,1)[xỹ, Block(1+Z.m)][Z.m+Z.j]
+        Zernike{T}(0)[xỹ, Block(1+Z.m)][Z.m+Z.j]
     else
-        Weighted(Zernike{T}(0,1))[xỹ, Block(2j-3+Z.m)][Z.m+Z.j]
+        Weighted(Zernike{T}(1))[xỹ, Block(2j-3+Z.m)][Z.m+Z.j]
     end
 end
 
@@ -52,29 +55,29 @@ end
 
 function ldiv(C::ContinuousZernikeElementMode{T}, f::AbstractQuasiVector) where T
     # T = promote_type(V, eltype(f))
-    Z = Zernike{T}(0,1)
+    Z0 = Zernike{T}(0)
+
     r = convert(T, f.args[1].domain.radius)
     # Need to take into account different scalings
     if r ≉  1
         fc(xy) = _scale_fcn(f.f, r, xy)
-        x = axes(Z,1)
+        x = axes(Z0,1)
         f̃ = fc.(x)
     else
         f̃ = f
     end
 
     # Seems to cache on its own, no need to memoize unlike annulus
-    c = Z \ f̃ # Zernike transform
+    c = Z0 \ f̃ # Zernike transform
     c̃ = paddeddata(c)
     N = size(c̃.matrix, 1) # degree
     
     # Restrict to relevant mode and add a column corresponding to the hat function.
-    R = Z \ Weighted(Z) # Very fast and does not change with width of disk.
+    R = Z0 \ Weighted(Zernike{T}(1)) # Very fast and does not change with width of disk.
 
-    # BUG! Random factor of 2, Issue raised: https://github.com/JuliaApproximation/MultivariateOrthogonalPolynomials.jl/issues/141 
-    R̃ =  [[T[1]; Zeros{T}(∞)] R.ops[C.m+1]/2]
+    R̃ =  [[T[1]; Zeros{T}(∞)] R.ops[C.m+1]]
 
-    # convert from Zernike(0,1) to hat + Bubble
+    # convert from Zernike(0,0) to hat + Bubble
     # Using adaptive ldiv, so possible we terminate before the required truncation
     # in FiniteContinuousZernike. So seperate case for that.
     cfs = T[]
@@ -96,8 +99,8 @@ end
 
     X = jacobimatrix(Normalized(Jacobi{T}(1,B.m)))
     M = ρ^2*(I-X)/2
-    M = [[T[ρ^2]; Zeros{T}(∞)] M]
-    Vcat([T[ρ^2*(B.m+2)]; T[ρ^2]; Zeros{T}(∞)]', M)
+    M = [[T[ρ^2/sqrt(B.m+2)]; Zeros{T}(∞)] M]
+    Vcat([T[ρ^2]; T[ρ^2/sqrt(B.m+2)]; Zeros{T}(∞)]', M)
 end
 
 ###
@@ -120,12 +123,12 @@ end
 
 @simplify function *(A::QuasiAdjoint{<:Any,<:GradientContinuousZernikeElementMode}, B::GradientContinuousZernikeElementMode)
     T = promote_type(eltype(A), eltype(B))
-    Z = Zernike(0,1)
+    Z = Zernike{T}(1)
     D = Z \ (Laplacian(axes(Z,1))*Weighted(Z))
     m = B.C.m
 
     Δ = -D.ops[m+1]
-    cₘ = π*m*zerniker(m,m,0,1,one(T))^2 # = <Z^(0,1)_{m,m,j}, Z^(0,1)_{m,m,j}>_L^2
+    cₘ = π*m*zerniker(m,m,0,0,one(T))^2 # = <Z^(0,1)_{m,m,j}, Z^(0,1)_{m,m,j}>_L^2
 
     Vcat([T[cₘ]; Zeros{T}(∞)]', [Zeros{T}(∞) Δ])
 end
@@ -151,13 +154,12 @@ function scalegrid(g::Matrix{RadialCoordinate{T}}, ρ::T) where T
 end
 
 function bubble2disk(m::Int, c::AbstractVector{T}) where T
-    Z = Zernike{T}(0,1)
-    R = Z \ Weighted(Z) # Very fast and does not change with width of disk.
-    R̃ =  [[T[1]; Zeros{T}(∞)] R.ops[m+1]/2]
+    R = Zernike{T}(0) \ Weighted(Zernike{T}(1)) # Very fast and does not change with width of disk.
+    R̃ =  [[T[1]; Zeros{T}(∞)] R.ops[m+1]]
     if c isa LazyArray
         c = paddeddata(c)
     end
-    R̃[1:length(c), 1:length(c)] * c # coefficients for Zernike(0,1)
+    R̃[1:length(c), 1:length(c)] * c # coefficients for Zernike(0,0)
 end
 
 function plotvalues(u::ApplyQuasiVector{T,typeof(*),<:Tuple{ContinuousZernikeElementMode, AbstractVector}}) where T
@@ -165,7 +167,6 @@ function plotvalues(u::ApplyQuasiVector{T,typeof(*),<:Tuple{ContinuousZernikeEle
     ρ = convert(T, last(C.points))
     m = C.m
 
-    Z = Zernike{T}(0,1)
     c̃ = bubble2disk(m, c)
 
     # Massage coeffcients into ModalTrav form.
@@ -184,6 +185,6 @@ function plotvalues(u::ApplyQuasiVector{T,typeof(*),<:Tuple{ContinuousZernikeEle
     # g, (Z*pad(F,axes(Z,2)))[grid(C,N)]
 
     # Use fast transforms for synthesis
-    FT = ZernikeITransform{T}(2N+C.m, 0, 1)
-    g, FT * pad(F,axes(Z,2))[Block.(OneTo(2N+C.m))]
+    FT = ZernikeITransform{T}(2N+C.m, 0, 0)
+    g, FT * pad(F,blockedrange(oneto(∞)))[Block.(OneTo(2N+C.m))]
 end

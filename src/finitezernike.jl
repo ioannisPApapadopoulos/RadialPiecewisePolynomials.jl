@@ -70,7 +70,7 @@ function FiniteZernikeBasis(N::Int, points::AbstractVector{T}, a::Int, b::Int) w
     end
 
     if ρs[1] ≈ 0
-        Zs = [Zernike{T}(0,1); ZernikeAnnulus{T}.(ρs[2:end], a, b)]
+        Zs = [Zernike{T}(a,b); ZernikeAnnulus{T}.(ρs[2:end], a, b)]
     else
         Zs = ZernikeAnnulus{T}.(ρs, a, b)
     end

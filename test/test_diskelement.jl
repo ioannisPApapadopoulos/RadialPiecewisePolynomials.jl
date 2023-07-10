@@ -24,45 +24,48 @@ import MultivariateOrthogonalPolynomials: Zernike, ModalTrav
     end
 
     @testset "evaluation" begin
-        N = 11 
-        Z = Zernike(1)
+        N = 11
+        Z0 = Zernike(0)
+        Z1 = Zernike(1)
         b = SVector(0.1,0.2)
         
         for (m,j) in [(0,1), (1,0), (1,1), (4,0), (5,1)] 
             C = ContinuousZernikeElementMode(m, j)     
-            @test C[b, 2:N] ≈ ModalTrav(Weighted(Z)[b, Block.(1:2N+4)]).matrix[1:N-1, 2m+j]
-            @test C[b, 1] ≈ ModalTrav(Z[b, Block.(1:2N+4)]).matrix[1, 2m+j]
+            @test C[b, 2:N] ≈ ModalTrav(Weighted(Z1)[b, Block.(1:2N+4)]).matrix[1:N-1, 2m+j]
+            @test C[b, 1] ≈ ModalTrav(Z0[b, Block.(1:2N+4)]).matrix[1, 2m+j]
         end
     end
 
     @testset "conversion" begin
-        Z = Zernike(0,1)
+        Z0 = Zernike(0)
+        Z1 = Zernike(1)
         b = SVector(0.1,0.2)
-        R = (Z \ Weighted(Z))
+        R = (Z0 \ Weighted(Z1))
         N = 11
 
+        # Alternative formulation via Zernike(1) rather than Zernike(0)
         for (m,j) in [(0,1), (1,0), (1,1), (4,0), (5,1)] 
             C = ContinuousZernikeElementMode(m, j)
-            R̃ =  [[1.0; Zeros(∞)] R.ops[C.m+1]/2]
-            @test C[b, 1:N]' ≈ ModalTrav(Z[b, Block.(1:3N)]).matrix[1:N,2*C.m+C.j]' * R̃[1:N, 1:N]
+            R̃ =  [[1.0; Zeros(∞)] R.ops[C.m+1]]
+            @test C[b, 1:N]' ≈ ModalTrav(Z0[b, Block.(1:3N)]).matrix[1:N,2*C.m+C.j]' * R̃[1:N, 1:N]
         end
     end
 
     @testset "transform scaling" begin
         ρ = 0.6
         C = ContinuousZernikeElementMode([0; ρ], 0, 1)
-        C̃ = ContinuousZernikeElementMode([0; 1], 0, 1)
+        C̃ = ContinuousZernikeElementMode(0, 1)
 
         @test C[SVector(0+eps(), 0), 1:10] ≈ C̃[SVector(0+eps(), 0), 1:10]
         @test C[SVector(ρ-eps(), 0), 1:10] ≈ C̃[SVector(1-eps(), 0), 1:10]
 
-        f = C \ f0.(x)
+        f = C \ f0.(axes(C,1))
         for b in ([0.55, 0], [0.51, 0.02])
             @test (C*f)[b] ≈ f0(b)
         end
 
         C = ContinuousZernikeElementMode([0; ρ], 1, 1)
-        C̃ = ContinuousZernikeElementMode([0; 1], 1, 1)
+        C̃ = ContinuousZernikeElementMode(1, 1)
         @test C[SVector(ρ-eps(), 0), 1:10] ≈ C̃[SVector(1-eps(), 0), 1:10]
 
         f = C \ f1c.(axes(C,1))
@@ -73,7 +76,7 @@ import MultivariateOrthogonalPolynomials: Zernike, ModalTrav
 
     @testset "mass matrix" begin
         # Test m = 0
-        C = ContinuousZernikeElementMode([0; 1], 0, 1)
+        C = ContinuousZernikeElementMode(0, 1)
         fc = C \ f0.(axes(C,1))
         M = C' * C
         # ∫_0^2π ∫_0^1 exp(-r^2)^2 r dr dθ.
@@ -81,14 +84,14 @@ import MultivariateOrthogonalPolynomials: Zernike, ModalTrav
         @test fc[1:N]' * M[1:N,1:N] * fc[1:N] ≈  π/2 * (1.0 - exp(-2))
 
         # Test m = 1
-        C = ContinuousZernikeElementMode([0; 1], 1, 0)
+        C = ContinuousZernikeElementMode(1, 0)
         fc = C \ f1s.(axes(C,1))
         M = C' * C
         # NumberForm[NIntegrate[Sin[2*x]^2, {x, 0, 2*Pi}]*NIntegrate[Exp[-r^2]^2*r^3, {r, 0, 1}], 16]
         N = 100
         @test fc[1:N]' * M[1:N,1:N] * fc[1:N] ≈ 0.233260957353361
         # Test m = 6
-        C = ContinuousZernikeElementMode([0; 1], 6, 1)
+        C = ContinuousZernikeElementMode(6, 1)
         fc = C \ f6.(axes(C,1))
         M = C' * C 
         #NumberForm[NIntegrate[Sin[6*x]^2, {x, 0, 2*Pi}]*NIntegrate[Exp[-r^2]^2*r^13, {r, 0, 1}], 16]
@@ -115,7 +118,7 @@ import MultivariateOrthogonalPolynomials: Zernike, ModalTrav
     end
 
     @testset "differentiation matrix" begin
-        C = ContinuousZernikeElementMode([0; 1], 0, 1)
+        C = ContinuousZernikeElementMode(0, 1)
         fc = C \ f0.(axes(C,1))
         ∇ = Derivative(axes(C,1)); Δ = (∇*C)' * (∇*C)
         # ∫_0^2π ∫_ρ^1 |∇ exp(-r^2)|^2 r dr dθ.
@@ -123,7 +126,7 @@ import MultivariateOrthogonalPolynomials: Zernike, ModalTrav
         N = 100; @test fc[1:N]' * Δ[1:N,1:N] * fc[1:N] ≈ 1.866087658826886
 
         # Test m = 1
-        C = ContinuousZernikeElementMode([0; 1], 1, 0)
+        C = ContinuousZernikeElementMode(1, 0)
         fc = C \ f1s.(axes(C,1))
         ∇ = Derivative(axes(C,1)); Δ = (∇*C)' * (∇*C)
         # ∫_0^2π ∫_ρ^1 |∇ exp(-r^2) r sin(θ)|^2 r dr dθ.
@@ -131,7 +134,7 @@ import MultivariateOrthogonalPolynomials: Zernike, ModalTrav
         N = 100; @test fc[1:N]' * Δ[1:N,1:N] * fc[1:N] ≈ 0.933043829413443
 
         # Test m = 6
-        C = ContinuousZernikeElementMode([0; 1], 6, 1)
+        C = ContinuousZernikeElementMode(6, 1)
         fc = C \ f6.(axes(C,1))
         ∇ = Derivative(axes(C,1)); Δ = (∇*C)' * (∇*C)
         # ∫_0^2π ∫_0^1 |∇ exp(-r^2) r^6 cos(6θ)|^2 r dr dθ.

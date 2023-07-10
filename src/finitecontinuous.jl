@@ -57,10 +57,12 @@ function _getFs(N::Int, points::AbstractVector{T}) where T
     Ms, ms, js = _getMs_ms_js(N)
     K = length(points)-1
 
+    κ = first(points[1]) ≈ 0 ? 2 : 1
+
     # List of radii of the annuli
     ρs = []
-    for k = 1:length(points)-1
-        α, β = convert(T, first(points[k])), convert(T, last(points[k+1]))
+    for k = κ:length(points)-1
+        α, β = convert(T, points[k]), convert(T, points[k+1])
         append!(ρs, [α / β])
     end
     # Semiclassical Jacobi parameter t
@@ -80,11 +82,11 @@ function _getFs(N::Int, points::AbstractVector{T}) where T
     for (M, m, j) in zip(Ms, ms, js)
         # Extract the lowering and differentiation matrices associated
         # with each Fourier mode and store in the Tuples
-        L₁₁ = NTuple{K, AbstractMatrix}([Ls[i][1][m+1] for i in 1:K])
-        L₀₁ = NTuple{K, AbstractMatrix}([Ls[i][2][m+1] for i in 1:K])
-        L₁₀ = NTuple{K, AbstractMatrix}([Ls[i][3][m+1] for i in 1:K])
+        L₁₁ = NTuple{K+1-κ, AbstractMatrix}([Ls[i][1][m+1] for i in 1:K+1-κ])
+        L₀₁ = NTuple{K+1-κ, AbstractMatrix}([Ls[i][2][m+1] for i in 1:K+1-κ])
+        L₁₀ = NTuple{K+1-κ, AbstractMatrix}([Ls[i][3][m+1] for i in 1:K+1-κ])
         
-        D = NTuple{K, AbstractMatrix}([(Ds[i]).ops[m+1] for i in 1:K])
+        D = NTuple{K+1-κ, AbstractMatrix}([(Ds[i]).ops[m+1] for i in 1:K+1-κ])
 
         # Construct the structs for each Fourier mode seperately
         append!(Fs, [FiniteContinuousZernikeMode(M, points, m, j, L₁₁, L₀₁, L₁₀, D, N)])
@@ -207,9 +209,9 @@ function finite_plotvalues(F::FiniteContinuousZernike, us::AbstractVector)
     for k in 1:K
         if k == 1 && first(points) ≈ 0
             ρ = points[2]
-            Z = Zernike{T}(0,1)
+            Z = Zernike{T}(0)
             g = scalegrid(AlgebraicCurveOrthogonalPolynomials.grid(Z, Block(2N)), ρ)
-            FT = ZernikeITransform{T}(2N, 0, 1)
+            FT = ZernikeITransform{T}(2N, 0, 0)
             val = FT * pad(ModalTrav(Ũs[:,:,k]),axes(Z,2))[Block.(OneTo(2N))]
         else
             α, β = points[k], points[k+1]

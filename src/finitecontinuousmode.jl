@@ -14,7 +14,8 @@ function FiniteContinuousZernikeMode(N::Int, points::AbstractVector{T}, m::Int, 
     @assert length(points) > 1 && points == sort(points)
     @assert m ≥ 0
     @assert m == 0 ? j == 1 : 0 ≤ j ≤ 1
-    @assert length(L₁₁) == length(L₀₁) == length(L₁₀) == length(D) == length(points)-1
+    K = first(points) ≈ 0 ? length(points)-2 : length(points) - 1
+    @assert length(L₁₁) == length(L₀₁) == length(L₁₀) == length(D) == K
     FiniteContinuousZernikeMode{T}(N, points, m, j, L₁₁, L₀₁, L₁₀, D, b)
 end
 
@@ -51,9 +52,8 @@ end
 function _getCs(points::AbstractVector{T}, m::Int, j::Int, b::Int, L₁₁, L₀₁, L₁₀, D) where T
     K = length(points)-1
     first(points) > 0 && return [ContinuousZernikeAnnulusElementMode([points[k]; points[k+1]], m, j, L₁₁[k], L₀₁[k], L₁₀[k], D[k], b) for k in 1:K]
-    
-    error("Fix disk element.")
-    append!(Any[ContinuousZernikeElementMode{T}([points[1]; points[2]], m, j)], [ContinuousZernikeAnnulusElementMode{T}([points[k]; points[k+1]], m, j, b) for k in 2:K])
+
+    append!(Any[ContinuousZernikeElementMode([points[1]; points[2]], m, j)], [ContinuousZernikeAnnulusElementMode([points[k]; points[k+1]], m, j, L₁₁[k-1], L₀₁[k-1], L₁₀[k-1], D[k-1], b) for k in 2:K])
 end
 
 function _getCs(F::FiniteContinuousZernikeMode)
@@ -66,7 +66,7 @@ function _getγs(points::AbstractArray{T}, m::Int) where T
     K = length(points)-1
     first(points) > 0 && return [(one(T)-(points[k+1]/points[k+2])^2)*(points[k+1]/points[k+2])^m / (one(T)-(points[k]/points[k+1])^2) for k in 1:K-1]
     γ = [(one(T)-(points[k+1]/points[k+2])^2)*(points[k+1]/points[k+2])^m / (one(T)-(points[k]/points[k+1])^2) for k in 2:K-1]
-    return append!([(one(T)-(points[2]/points[3])^2)*(points[2]/points[3])^m / (sqrt(convert(T,2)^(m+3-iszero(m))/π) * normalizedjacobip(0, 1, m, 1.0))],γ)
+    return append!([(one(T)-(points[2]/points[3])^2)*(points[2]/points[3])^m / (sqrt(convert(T,2)^(m+2-iszero(m))/π) * normalizedjacobip(0, 0, m, 1.0))],γ)
 end
 
 # function getindex(F::FiniteContinuousZernikeMode{T}, xy::StaticVector{2}, j::Int)::T where {T}
