@@ -8,13 +8,21 @@ struct ZernikeBasisMode{T, P<:AbstractArray{T}} <: Basis{T}
 end
 
 function ZernikeBasisMode(points::AbstractVector{T}, a::Int, b::Int, m::Int, j::Int) where T
-    @assert length(points) == 2 && zero(T) < points[1] < points[2] ≤ one(T)
+    @assert length(points) == 2 && zero(T) ≤ points[1] < points[2] ≤ one(T)
     @assert m ≥ 0
     @assert m == 0 ? j == 1 : 0 ≤ j ≤ 1
     ZernikeBasisMode{T, Vector{T}}(points, a, b, m, j)
 end
 
-axes(Z::ZernikeBasisMode) = (Inclusion(annulus(first(Z.points), last(Z.points))), oneto(∞))
+function axes(Z::ZernikeBasisMode) 
+    α = first(Z.points)
+    if α ≈ 0
+        (Inclusion(last(Z.points)*UnitDisk{eltype(Z)}()), oneto(∞))
+    else
+        (Inclusion(annulus(α, last(Z.points))), oneto(∞))
+    end
+end
+
 ==(P::ZernikeBasisMode, Q::ZernikeBasisMode) = P.points == Q.points && P.m == Q.m && P.j == Q.j && P.a == Q.a && P.b == Q.b
 
 
@@ -43,10 +51,9 @@ end
 
 function _getZs(points::AbstractVector{T}, a::Int, b::Int, m::Int, j::Int) where T
     K = length(points)-1
-    first(points) > 0 && return [ZernikeBasisMode([points[k]; points[k+1]], a, b, m, j) for k in 1:K]
-
-    error("Fix disk element.")
+    return [ZernikeBasisMode([points[k]; points[k+1]], a, b, m, j) for k in 1:K]
 end
+
 function _getZs(F::FiniteZernikeBasisMode)
     points, a, b, m, j = F.points, F.a, F.b, F.m, F.j
     _getZs(points, a, b, m, j)
@@ -183,6 +190,24 @@ end
         Vcat(Hcat(β^2*m₀*L₁₀[:,1], β^2*m₀*L₀₁[:,1])', β^2*m₀*L₁₁')
     else
         error("L²-inner product between ContinuousZernikeAnnulusElementMode and ZernikeBasisMode not implemented for parameters Z.a = $a and Z.b = $b")
+    end
+end
+
+@simplify function *(FT::QuasiAdjoint{<:Any,<:ContinuousZernikeElementMode}, Z::ZernikeBasisMode)
+    T = promote_type(eltype(FT), eltype(Z))
+    F = FT.parent
+
+    @assert F.points == Z.points && F.m == Z.m && F.j == Z.j
+
+    points, a, b, m = Z.points, Z.a, Z.b, Z.m
+    α, β = first(points), last(points)
+    @assert α ≈ 0
+
+    if a == 0 && b == 0
+        L = Zernike(0) \ Weighted(Zernike(1))
+        Vcat(Hcat(β^2, Zeros{T}(1,∞)), β^2*L.ops[m+1]')
+    else
+        error("L²-inner product between ContinuousZernikeElementMode and ZernikeBasisMode not implemented for parameters Z.a = $a and Z.b = $b")
     end
 end
 

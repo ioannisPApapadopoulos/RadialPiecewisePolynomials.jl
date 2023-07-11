@@ -135,11 +135,12 @@ function _piece_element_matrix(Ms, N::Int, m::Int, points::AbstractVector{T}) wh
         M[i, N+1] = Ms[2][1,2]*γs[2]
         M[N+1, i] = Ms[2][2,1]*γs[2]
 
-        # Right-side of hat function interaction with bubble functions
-        M[i, N+2:N+3] = Ms[2][1,3:4]
-        M[N+2:N+3,i] = Ms[2][3:4,1]
-
         b = min(N-1, 3)
+
+        # Right-side of hat function interaction with bubble functions
+        M[i, N+2:N+b] = Ms[2][1,3:b+1]
+        M[N+2:N+b,i] = Ms[2][3:b+1,1]
+
         for k in 2:K-1
             # Convert left-side of hat function coefficients for continuity
             M[N+(k-2)*(N-1)+1, N+(k-2)*(N-1)+1:N+(k-2)*(N-1)+b] *= γs[k]

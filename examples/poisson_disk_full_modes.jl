@@ -19,29 +19,29 @@ function rhs_xy(xy)
 end
 
 points = [0;0.3;0.5;0.8;1.0]; K = length(points)-1
-N=40; F = FiniteContinuousZernike(N, points)
+N=40; F = FiniteContinuousZernike(N, points); Z = FiniteZernikeBasis(N, points, 0, 0)
 
 x = axes(F,1)
 
-f = F \ rhs_xy.(x)
+fz = Z \ rhs_xy.(x)
 
-(θs, rs, vals) = finite_plotvalues(F, f)
-vals_, error = inf_error(F, θs, rs, vals, rhs_xy) # Check inf-norm errors on the grid
-error
-plot(F, θs, rs, vals)
+(θs, rs, vals) = finite_plotvalues(Z, fz)
+vals_, err = inf_error(Z, θs, rs, vals, rhs_xy) # Check inf-norm errors on the grid
+err
+plot(Z, θs, rs, vals)
 
 # Solve Poisson equation in weak form
 M = F' * F # list of mass matrices for each Fourier mode
 D = Derivative(axes(F,1))
 Δ = (D*F)' * (D*F) # list of stiffness matrices for each Fourier mode
 
-Mf = M .* f # right-hand side
+Mf = (F'*Z) .* fz # right-hand side
 zero_dirichlet_bcs!(F, Δ, Mf) # bcs
 
 # Solve over each Fourier mode seperately
 u = Δ .\ Mf
 
 (θs, rs, vals) = finite_plotvalues(F, u)
-vals_, error = inf_error(F, θs, rs, vals, ua_xy) # Check inf-norm errors on the grid
-error
+vals_, err = inf_error(F, θs, rs, vals, ua_xy) # Check inf-norm errors on the grid
+err
 plot(F, θs, rs, vals) # plot
