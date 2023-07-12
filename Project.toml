@@ -5,6 +5,9 @@ version = "0.1.1"
 
 [deps]
 AlgebraicCurveOrthogonalPolynomials = "b2d6dd58-be48-4100-8375-7f7d22241ed8"
+BandedMatrices = "aae01518-5342-5314-be14-df237901396f"
+BlockArrays = "8e7c35d0-a365-5155-bbbb-fb81a777f24e"
+BlockBandedMatrices = "ffab5731-97b5-5995-9138-79e8c1846df0"
 ClassicalOrthogonalPolynomials = "b30e2e7b-c4ee-47da-9d5f-2c5c27239acd"
 ContinuumArrays = "7ae1f121-cc2c-504b-ac30-9b923412ae5c"
 DomainSets = "5b8099bc-c8ec-5219-889f-1d9e522a28bf"

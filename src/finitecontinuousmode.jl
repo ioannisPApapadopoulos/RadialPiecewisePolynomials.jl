@@ -41,14 +41,15 @@ function FiniteContinuousZernikeMode(N::Int, points::AbstractVector{T}, m::Int, 
     FiniteContinuousZernikeMode(N, points, m, j, L₁₁, L₀₁, L₁₀, D, m+2N) 
 end
 
-# FiniteContinuousZernikeMode(N::Int, points::AbstractVector, m::Int, j::Int, L₁₁, L₀₁, L₁₀, D, b::Int) = FiniteContinuousZernikeMode{Float64}(N, points, m, j, L₁₁, L₀₁, L₁₀, D, b)
-# FiniteContinuousZernikeMode(N::Int, points::AbstractVector, m::Int, j::Int, L₁₁, L₀₁, L₁₀, D) = FiniteContinuousZernikeMode{Float64}(N, points, m, j, L₁₁, L₀₁, L₁₀, D, m+2N)
+# FiniteContinuousZernikeMode(points::AbstractVector, m::Int, j::Int, L₁₁, L₀₁, L₁₀, D, b::Int) = FiniteContinuousZernikeMode{Float64}(points, m, j, L₁₁, L₀₁, L₁₀, D, b)
+# FiniteContinuousZernikeMode(points::AbstractVector, m::Int, j::Int, L₁₁, L₀₁, L₁₀, D) = FiniteContinuousZernikeMode{Float64}(points, m, j, L₁₁, L₀₁, L₁₀, D, m+2N)
 
 function axes(Z::FiniteContinuousZernikeMode{T}) where T
-    first(Z.points) ≈ 0 && return (Inclusion(last(Z.points)*UnitDisk{T}()), oneto(Z.N*(length(Z.points)-1)-(length(Z.points)-2)))
-    (Inclusion(annulus(first(Z.points), last(Z.points))), oneto(Z.N*(length(Z.points)-1)-(length(Z.points)-2)))
+    first(Z.points) ≈ 0 && return (Inclusion(last(Z.points)*UnitDisk{T}()), blockedrange(Vcat(length(Z.points), Fill(length(Z.points) - 1, Z.N-2))))
+    # (Inclusion(annulus(first(Z.points), last(Z.points))), oneto(Z.N*(length(Z.points)-1)-(length(Z.points)-2)))
+    (Inclusion(annulus(first(Z.points), last(Z.points))), blockedrange(Vcat(length(Z.points), Fill(length(Z.points) - 1, Z.N-2))))
 end
-==(P::FiniteContinuousZernikeMode, Q::FiniteContinuousZernikeMode) = P.N == Q.N && P.points == Q.points && P.m == Q.m && P.j == Q.j && P.b == Q.b
+==(P::FiniteContinuousZernikeMode, Q::FiniteContinuousZernikeMode) = P.points == Q.points && P.m == Q.m && P.j == Q.j && P.b == Q.b
 
 function _getCs(points::AbstractVector{T}, m::Int, j::Int, b::Int, L₁₁, L₀₁, L₁₀, D) where T
     K = length(points)-1
@@ -69,7 +70,7 @@ function _getγs(points::AbstractArray{T}, m::Int) where T
     γ = [(one(T)-(points[k+1]/points[k+2])^2)*(points[k+1]/points[k+2])^m / (one(T)-(points[k]/points[k+1])^2) for k in 2:K-1]
     return append!([(one(T)-(points[2]/points[3])^2)*(points[2]/points[3])^m / (sqrt(convert(T,2)^(m+2-iszero(m))/π) * normalizedjacobip(0, 0, m, 1.0))],γ)
 end
-
+_getγs(F::FiniteContinuousZernikeMode{T}) where T = _getγs(F.points, F.m)
 # function getindex(F::FiniteContinuousZernikeMode{T}, xy::StaticVector{2}, j::Int)::T where {T}
 #     points = T.(F.points); K = length(points)-1
 #     N = F.N; m = F.m; j = F.j;
@@ -92,39 +93,97 @@ end
 # end
 
 
-function ldiv(F::FiniteContinuousZernikeMode{V}, f::AbstractQuasiVector) where V
-    # T = promote_type(V, eltype(f))
-
-    T = V
+function ldiv(F::FiniteContinuousZernikeMode{T}, f::AbstractQuasiVector) where T
+    N = F.N
     points = T.(F.points); K = length(points)-1
-    N = F.N; m = F.m; j = F.j;
     Cs = _getCs(F)
     fs = [C \ f.f.(axes(C, 1)) for C in Cs]
 
-    f = fs[K][2:N]; for k in K-1:-1:2  f = vcat(fs[k+1][1], fs[k][3:N], f) end
+    hats = vcat([fs[i][1] for i in 1:K-1], fs[end][1:2])
 
-    if first(points) ≈ 0
-        f = vcat(fs[2][1], fs[1][2:N], f)
-    else
-        f = vcat(fs[1][1], fs[2][1], fs[1][3:N], f)
-    end
+    bubbles = zeros(T, N-2, K)
+    for i in 1:K bubbles[:,i] = fs[i][3:N] end
 
-    return f
+    pad(append!(hats, vec(bubbles')), axes(F,2))
 end
 
 
 ###
 # L2 inner product
 ###
+function _build_top_left_block(Ms, γs::AbstractArray{T}) where T
+    K = length(Ms)
+
+    a = []
+    for i in 1:K
+        append!(a, diag(Ms[i][1:2,1:2]))
+    end
+
+    dv = zeros(T, K+1)
+    dv[1] = a[1]; dv[end] = a[end];
+    for i in 1:K-1
+        dv[i+1] = a[2i]*γs[i]^2 + a[2i+1]
+    end
+
+    ev = zeros(T, K)
+    γs = vcat(γs, one(T))
+    for i in 1:K
+        ev[i] = Ms[i][1,2] * γs[i]
+    end
+
+    Symmetric(BandedMatrix(0=>dv, 1=>ev))
+end
+
+function _build_mass_second_block(Ms, γs::AbstractArray{T}) where T
+    K = length(Ms)
+    γs = vcat(γs, one(T))
+    dv, ev = [zeros(T, K), zeros(T,K)], [zeros(T, K), zeros(T,K)]
+    for i in 1:K
+        dv[1][i] = Ms[i][1,3]
+        ev[1][i] = Ms[i][2,3] * γs[i]
+        dv[2][i] = Ms[i][1,4]
+        ev[2][i] = Ms[i][2,4] * γs[i]
+    end
+    [BandedMatrix((0=>dv[j], -1=>ev[j]), (K+1, K)) for j in 1:2]
+end
+
+function _build_mass_trailing_bubbles(Ms, γs::AbstractArray{T}, N::Int) where T
+    K = length(Ms)
+
+    Mn = [Ms[i][3:N, 3:N] for i in 1:K]
+    [Symmetric(BandedMatrix(0=>view(M, band(0)), 1=>view(M, band(1)), 2=>view(M, band(2)))) for M in Mn]
+end
+
+function _arrow_head_mass_matrix(Ms, γs::AbstractArray{T}, N::Int) where T
+    A = _build_top_left_block(Ms, γs)
+    B = _build_mass_second_block(Ms, γs)
+    C = BandedMatrix{T, Matrix{T}, Base.OneTo{Int64}}[]
+    D = _build_mass_trailing_bubbles(Ms, γs, N)
+    Symmetric(ArrowheadMatrix(A, B, C, D))
+end
+
+# FIXME: Need to make type-safe
+@simplify function *(A::QuasiAdjoint{<:Any,<:FiniteContinuousZernikeMode}, B::FiniteContinuousZernikeMode)
+    # T = promote_type(eltype(A), eltype(B))
+    @assert A' == B
+
+    Cs = _getCs(B)
+
+    Ms = [C' * C for C in Cs]
+    γs = _getγs(B)
+
+    _arrow_head_mass_matrix(Ms, γs, B.N)
+end
+
 function _piece_element_matrix(Ms, N::Int, m::Int, points::AbstractVector{T}) where T
     K = length(points)-1
-    M = Hcat(Matrix{T}(Ms[1][1:N, 1:N]), spzeros(N,(K-1)*(N-1)))
+    M = Hcat(Matrix{T}(Ms[1][1:N, 1:N]), zeros(N,(K-1)*(N-1)))
 
     if K > 1
         γs = _getγs(points, m)
         append!(γs, one(T))
         for k in 2:K
-            M = Matrix(Vcat(M, Hcat(zeros(T, N-1, N+(k-2)*(N-1)), Ms[k][2:N, 2:N], spzeros(T, N-1, (K-k)*(N-1)))))
+            M = Matrix(Vcat(M, Hcat(zeros(T, N-1, N+(k-2)*(N-1)), Ms[k][2:N, 2:N], zeros(T, N-1, (K-k)*(N-1)))))
         end
 
         i = first(points) ≈ 0 ? 1 : 2 # disk or annulus?
@@ -160,20 +219,6 @@ function _piece_element_matrix(Ms, N::Int, m::Int, points::AbstractVector{T}) wh
     return M
 end
 
-# FIXME: Need to make type-safe
-@simplify function *(A::QuasiAdjoint{<:Any,<:FiniteContinuousZernikeMode}, B::FiniteContinuousZernikeMode)
-    T = promote_type(eltype(A), eltype(B))
-    @assert A' == B
-
-    points = T.(B.points)
-    N = B.N; m = B.m;
-    Cs = _getCs(B)
-
-    Ms = [C' * C for C in Cs]
-
-    _piece_element_matrix(Ms, N, m, points)
-end
-
 ###
 # Gradient for constructing weak Laplacian.
 ###
@@ -184,11 +229,37 @@ end
 
 # GradientFiniteContinuousZernikeAnnulusMode(F::FiniteContinuousZernikeMode{T}) where T =  GradientFiniteContinuousZernikeAnnulusMode{T}(F)
 
-axes(Z:: GradientFiniteContinuousZernikeAnnulusMode) = (Inclusion(last(Z.F.points)*UnitDisk{eltype(Z)}()), oneto(Z.F.N*(length(Z.F.points)-1)-(length(Z.F.points)-2)))
-==(P::GradientFiniteContinuousZernikeAnnulusMode, Q::GradientFiniteContinuousZernikeAnnulusMode) = P.F.points == Q.F.points && P.F.m == Q.F.m && P.F.j == Q.F.j && P.F.b == Q.F.b
+axes(Z:: GradientFiniteContinuousZernikeAnnulusMode) = axes(Z.F)
+==(P::GradientFiniteContinuousZernikeAnnulusMode, Q::GradientFiniteContinuousZernikeAnnulusMode) = P.F == Q.F
 
 @simplify function *(D::Derivative, F::FiniteContinuousZernikeMode)
     GradientFiniteContinuousZernikeAnnulusMode(F)
+end
+
+function _build_lap_second_block(Ms, γs::AbstractArray{T}) where T
+    K = length(Ms)
+    γs = vcat(γs, one(T))
+    dv, ev = [zeros(T, K)], [zeros(T, K)]
+    for i in 1:K
+        dv[1][i] = Ms[i][1,3]
+        ev[1][i] = Ms[i][2,3] * γs[i]
+    end
+    [BandedMatrix((0=>dv[1], -1=>ev[1]), (K+1, K))]
+end
+
+function _build_lap_trailing_bubbles(Ms, γs::AbstractArray{T}, N::Int) where T
+    K = length(Ms)
+
+    Mn = [Ms[i][3:N, 3:N] for i in 1:K]
+    [Symmetric(BandedMatrix(0=>view(M, band(0)), 1=>view(M, band(1)))) for M in Mn]
+end
+
+function _arrow_head_lap_matrix(Ms, γs::AbstractArray{T}, N::Int) where T
+    A = _build_top_left_block(Ms, γs)
+    B = _build_lap_second_block(Ms, γs)
+    C = BandedMatrix{T, Matrix{T}, Base.OneTo{Int64}}[]
+    D = _build_lap_trailing_bubbles(Ms, γs, N)
+    Symmetric(ArrowheadMatrix(A, B, C, D))
 end
 
 @simplify function *(A::QuasiAdjoint{<:Any,<:GradientFiniteContinuousZernikeAnnulusMode}, B::GradientFiniteContinuousZernikeAnnulusMode)
@@ -197,14 +268,17 @@ end
     F = B.F
 
     points = T.(F.points)
-    N = F.N; m = F.m; j = F.j;
+    N = F.N; m = F.m;
     Cs = _getCs(F)
     
     xs = [axes(C,1) for C in Cs]
     Ds = [Derivative(x) for x in xs]
     Δs = [(D*C)' * (D*C) for (C, D) in zip(Cs, Ds)]
 
-    return _piece_element_matrix(Δs, N, m, points)
+    γs = _getγs(F)
+
+    # return _piece_element_matrix(Δs, N, m, points)
+    return _arrow_head_lap_matrix(Δs, γs, N)
 end
 
 function zero_dirichlet_bcs!(F::FiniteContinuousZernikeMode{T}, Δ::AbstractMatrix{T}, Mf::AbstractVector{T}) where T

@@ -43,8 +43,8 @@ f1s(xy) = exp(-first(xy)^2-last(xy)^2) * sqrt(first(xy)^2+last(xy)^2)*sin(atan(l
         @test size(M) == (K*N-(K-1), K*N-(K-1))
         ∇ = Derivative(axes(F,1)); Δ = (∇*F)' * (∇*F)
         @test size(Δ) == (K*N-(K-1), K*N-(K-1))
-        @test fc' * M * fc ≈  π/2 * (exp(-2*0.2^2) - exp(-2))
-        @test fc' * Δ * fc ≈  1.856554980031349
+        @test fc' * (M * fc) ≈  π/2 * (exp(-2*0.2^2) - exp(-2))
+        @test fc' * (Δ * fc) ≈  1.856554980031349
 
         F = FiniteContinuousZernikeMode(N, points, 1, 0)
         fc = F \ f1s.(axes(F,1))
@@ -52,8 +52,8 @@ f1s(xy) = exp(-first(xy)^2-last(xy)^2) * sqrt(first(xy)^2+last(xy)^2)*sin(atan(l
         @test size(M) == (K*N-(K-1), K*N-(K-1))
         ∇ = Derivative(axes(F,1)); Δ = (∇*F)' * (∇*F)
         @test size(Δ) == (K*N-(K-1), K*N-(K-1))
-        @test fc' * M * fc ≈ 0.2320693725039186
-        @test fc' * Δ * fc ≈ 0.816915357578546
+        @test fc' * (M * fc) ≈ 0.2320693725039186
+        @test fc' * (Δ * fc) ≈ 0.816915357578546
 
         Memoization.empty_all_caches!()
         F = FiniteContinuousZernikeMode(N, points, 6, 1)
@@ -62,8 +62,8 @@ f1s(xy) = exp(-first(xy)^2-last(xy)^2) * sqrt(first(xy)^2+last(xy)^2)*sin(atan(l
         @test size(M) == (K*N-(K-1), K*N-(K-1))
         ∇ = Derivative(axes(F,1)); Δ = (∇*F)' * (∇*F)
         @test size(Δ) == (K*N-(K-1), K*N-(K-1))
-        @test fc' * M * fc ≈ 0.04005947846778158
-        @test fc' * Δ * fc ≈ 2.686674285690333
+        @test fc' * (M * fc) ≈ 0.04005947846778158
+        @test fc' * (Δ * fc) ≈ 2.686674285690333
 
         # disk + annuli elements
         N = 100; points = [0.0; 0.5; 0.8; 1.0]
