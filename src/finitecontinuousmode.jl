@@ -121,44 +121,48 @@ function _build_top_left_block(Ms, γs::AbstractArray{T}) where T
 
     dv = zeros(T, K+1)
     dv[1] = a[1]; dv[end] = a[end];
-    for i in 1:K-1
-        dv[i+1] = a[2i]*γs[i]^2 + a[2i+1]
-    end
-
     ev = zeros(T, K)
     γs = vcat(γs, one(T))
-    for i in 1:K
-        ev[i] = Ms[i][1,2] * γs[i]
-    end
+
+    for i in 1:K-1 dv[i+1] = a[2i]*γs[i]^2 + a[2i+1] end
+    for i in 1:K ev[i] = Ms[i][1,2] * γs[i] end
 
     Symmetric(BandedMatrix(0=>dv, 1=>ev))
 end
 
-function _build_mass_second_block(Ms, γs::AbstractArray{T}) where T
+function _build_second_block(Ms, γs::AbstractArray{T}, bs::Int) where T
     K = length(Ms)
     γs = vcat(γs, one(T))
-    dv, ev = [zeros(T, K), zeros(T,K)], [zeros(T, K), zeros(T,K)]
-    for i in 1:K
-        dv[1][i] = Ms[i][1,3]
-        ev[1][i] = Ms[i][2,3] * γs[i]
-        dv[2][i] = Ms[i][1,4]
-        ev[2][i] = Ms[i][2,4] * γs[i]
+    dv, ev = [], []
+    for j in 1:bs
+        append!(dv, [zeros(T, K)])
+        append!(ev, [zeros(T, K)])
+        for i in 1:K
+            dv[j][i] = Ms[i][1,j+2]
+            ev[j][i] = Ms[i][2,j+2] * γs[i]
+        end
     end
-    [BandedMatrix((0=>dv[j], -1=>ev[j]), (K+1, K)) for j in 1:2]
+    [BandedMatrix((0=>dv[j], -1=>ev[j]), (K+1, K)) for j in 1:bs]
 end
 
-function _build_mass_trailing_bubbles(Ms, γs::AbstractArray{T}, N::Int) where T
+function _build_trailing_bubbles(Ms,γs::AbstractArray{T}, N::Int, bs::Int) where T
     K = length(Ms)
 
     Mn = [Ms[i][3:N, 3:N] for i in 1:K]
-    [Symmetric(BandedMatrix(0=>view(M, band(0)), 1=>view(M, band(1)), 2=>view(M, band(2)))) for M in Mn]
+    if bs ==  2
+        return [Symmetric(BandedMatrix(0=>view(M, band(0)), 1=>view(M, band(1)), 2=>view(M, band(2)))) for M in Mn]
+    elseif bs == 1
+        return [Symmetric(BandedMatrix(0=>view(M, band(0)), 1=>view(M, band(1)))) for M in Mn]
+    else
+        error("Are you using _build_mass_trailing_bubbles correctly?")
+    end
 end
 
-function _arrow_head_mass_matrix(Ms, γs::AbstractArray{T}, N::Int) where T
+function _arrow_head_matrix(Ms, γs::AbstractArray{T}, N::Int, bs::Int) where T
     A = _build_top_left_block(Ms, γs)
-    B = _build_mass_second_block(Ms, γs)
+    B = _build_second_block(Ms, γs, bs)
     C = BandedMatrix{T, Matrix{T}, Base.OneTo{Int64}}[]
-    D = _build_mass_trailing_bubbles(Ms, γs, N)
+    D = _build_trailing_bubbles(Ms, γs, N, bs)
     Symmetric(ArrowheadMatrix(A, B, C, D))
 end
 
@@ -172,52 +176,52 @@ end
     Ms = [C' * C for C in Cs]
     γs = _getγs(B)
 
-    _arrow_head_mass_matrix(Ms, γs, B.N)
+    _arrow_head_matrix(Ms, γs, B.N, 2)
 end
 
-function _piece_element_matrix(Ms, N::Int, m::Int, points::AbstractVector{T}) where T
-    K = length(points)-1
-    M = Hcat(Matrix{T}(Ms[1][1:N, 1:N]), zeros(N,(K-1)*(N-1)))
+# function _piece_element_matrix(Ms, N::Int, m::Int, points::AbstractVector{T}) where T
+#     K = length(points)-1
+#     M = Hcat(Matrix{T}(Ms[1][1:N, 1:N]), zeros(N,(K-1)*(N-1)))
 
-    if K > 1
-        γs = _getγs(points, m)
-        append!(γs, one(T))
-        for k in 2:K
-            M = Matrix(Vcat(M, Hcat(zeros(T, N-1, N+(k-2)*(N-1)), Ms[k][2:N, 2:N], zeros(T, N-1, (K-k)*(N-1)))))
-        end
+#     if K > 1
+#         γs = _getγs(points, m)
+#         append!(γs, one(T))
+#         for k in 2:K
+#             M = Matrix(Vcat(M, Hcat(zeros(T, N-1, N+(k-2)*(N-1)), Ms[k][2:N, 2:N], zeros(T, N-1, (K-k)*(N-1)))))
+#         end
 
-        i = first(points) ≈ 0 ? 1 : 2 # disk or annulus?
-        M[i, 1:i+2] *= γs[1] # Convert the left-side hat function coefficients for continuity
-        M[1:i+2, i] *= γs[1]
-        M[i, i] += Ms[2][1,1] # Add the contribution from the right-side of the hat function
+#         i = first(points) ≈ 0 ? 1 : 2 # disk or annulus?
+#         M[i, 1:i+2] *= γs[1] # Convert the left-side hat function coefficients for continuity
+#         M[1:i+2, i] *= γs[1]
+#         M[i, i] += Ms[2][1,1] # Add the contribution from the right-side of the hat function
 
-        # Right-side of hat function with left-side of hat function in next element
-        M[i, N+1] = Ms[2][1,2]*γs[2]
-        M[N+1, i] = Ms[2][2,1]*γs[2]
+#         # Right-side of hat function with left-side of hat function in next element
+#         M[i, N+1] = Ms[2][1,2]*γs[2]
+#         M[N+1, i] = Ms[2][2,1]*γs[2]
 
-        b = min(N-1, 3)
+#         b = min(N-1, 3)
 
-        # Right-side of hat function interaction with bubble functions
-        M[i, N+2:N+b] = Ms[2][1,3:b+1]
-        M[N+2:N+b,i] = Ms[2][3:b+1,1]
+#         # Right-side of hat function interaction with bubble functions
+#         M[i, N+2:N+b] = Ms[2][1,3:b+1]
+#         M[N+2:N+b,i] = Ms[2][3:b+1,1]
 
-        for k in 2:K-1
-            # Convert left-side of hat function coefficients for continuity
-            M[N+(k-2)*(N-1)+1, N+(k-2)*(N-1)+1:N+(k-2)*(N-1)+b] *= γs[k]
-            M[N+(k-2)*(N-1)+1:N+(k-2)*(N-1)+b, N+(k-2)*(N-1)+1] *= γs[k]
-            M[N+(k-2)*(N-1)+1, N+(k-2)*(N-1)+1] += Ms[k+1][1,1] # add contribution of right-side of hat function
+#         for k in 2:K-1
+#             # Convert left-side of hat function coefficients for continuity
+#             M[N+(k-2)*(N-1)+1, N+(k-2)*(N-1)+1:N+(k-2)*(N-1)+b] *= γs[k]
+#             M[N+(k-2)*(N-1)+1:N+(k-2)*(N-1)+b, N+(k-2)*(N-1)+1] *= γs[k]
+#             M[N+(k-2)*(N-1)+1, N+(k-2)*(N-1)+1] += Ms[k+1][1,1] # add contribution of right-side of hat function
 
-            # Right-side of hat function with left-side of hat function in next element
-            M[N+(k-2)*(N-1)+1, N+(k-1)*(N-1)+1] = Ms[k+1][1,2]*γs[k+1]
-            M[N+(k-1)*(N-1)+1, N+(k-2)*(N-1)+1] = Ms[k+1][2,1]*γs[k+1]
+#             # Right-side of hat function with left-side of hat function in next element
+#             M[N+(k-2)*(N-1)+1, N+(k-1)*(N-1)+1] = Ms[k+1][1,2]*γs[k+1]
+#             M[N+(k-1)*(N-1)+1, N+(k-2)*(N-1)+1] = Ms[k+1][2,1]*γs[k+1]
 
-            # Right-side of hat function interaction with bubble functions
-            M[N+(k-2)*(N-1)+1, N+(k-1)*(N-1)+2:N+(k-1)*(N-1)+b] = Ms[k+1][1,3:b+1]
-            M[N+(k-1)*(N-1)+2:N+(k-1)*(N-1)+b, N+(k-2)*(N-1)+1] = Ms[k+1][3:b+1,1]
-        end
-    end
-    return M
-end
+#             # Right-side of hat function interaction with bubble functions
+#             M[N+(k-2)*(N-1)+1, N+(k-1)*(N-1)+2:N+(k-1)*(N-1)+b] = Ms[k+1][1,3:b+1]
+#             M[N+(k-1)*(N-1)+2:N+(k-1)*(N-1)+b, N+(k-2)*(N-1)+1] = Ms[k+1][3:b+1,1]
+#         end
+#     end
+#     return M
+# end
 
 ###
 # Gradient for constructing weak Laplacian.
@@ -236,32 +240,6 @@ axes(Z:: GradientFiniteContinuousZernikeAnnulusMode) = axes(Z.F)
     GradientFiniteContinuousZernikeAnnulusMode(F)
 end
 
-function _build_lap_second_block(Ms, γs::AbstractArray{T}) where T
-    K = length(Ms)
-    γs = vcat(γs, one(T))
-    dv, ev = [zeros(T, K)], [zeros(T, K)]
-    for i in 1:K
-        dv[1][i] = Ms[i][1,3]
-        ev[1][i] = Ms[i][2,3] * γs[i]
-    end
-    [BandedMatrix((0=>dv[1], -1=>ev[1]), (K+1, K))]
-end
-
-function _build_lap_trailing_bubbles(Ms, γs::AbstractArray{T}, N::Int) where T
-    K = length(Ms)
-
-    Mn = [Ms[i][3:N, 3:N] for i in 1:K]
-    [Symmetric(BandedMatrix(0=>view(M, band(0)), 1=>view(M, band(1)))) for M in Mn]
-end
-
-function _arrow_head_lap_matrix(Ms, γs::AbstractArray{T}, N::Int) where T
-    A = _build_top_left_block(Ms, γs)
-    B = _build_lap_second_block(Ms, γs)
-    C = BandedMatrix{T, Matrix{T}, Base.OneTo{Int64}}[]
-    D = _build_lap_trailing_bubbles(Ms, γs, N)
-    Symmetric(ArrowheadMatrix(A, B, C, D))
-end
-
 @simplify function *(A::QuasiAdjoint{<:Any,<:GradientFiniteContinuousZernikeAnnulusMode}, B::GradientFiniteContinuousZernikeAnnulusMode)
     T = promote_type(eltype(A), eltype(B))
     @assert A' == B
@@ -278,7 +256,7 @@ end
     γs = _getγs(F)
 
     # return _piece_element_matrix(Δs, N, m, points)
-    return _arrow_head_lap_matrix(Δs, γs, N)
+    return _arrow_head_matrix(Δs, γs, N, 1)
 end
 
 function zero_dirichlet_bcs!(F::FiniteContinuousZernikeMode{T}, Δ::AbstractMatrix{T}, Mf::AbstractVector{T}) where T
