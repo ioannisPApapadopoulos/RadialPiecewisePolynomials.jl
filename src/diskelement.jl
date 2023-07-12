@@ -75,7 +75,7 @@ function ldiv(C::ContinuousZernikeElementMode{T}, f::AbstractQuasiVector) where 
     # Restrict to relevant mode and add a column corresponding to the hat function.
     R = Z0 \ Weighted(Zernike{T}(1)) # Very fast and does not change with width of disk.
 
-    R̃ =  [[T[1]; Zeros{T}(∞)] R.ops[C.m+1]]
+    R̃ =  [[one(T); Zeros{T}(∞)] R.ops[C.m+1]]
 
     # convert from Zernike(0,0) to hat + Bubble
     # Using adaptive ldiv, so possible we terminate before the required truncation
@@ -140,7 +140,7 @@ end
 _angle(rθ::RadialCoordinate) = rθ.θ
 
 function grid(C::ContinuousZernikeElementMode{T}, j::Int) where T
-    Z = Zernike{T}(zero(T), one(T))
+    Z = Zernike{T}(zero(T), zero(T))
     MultivariateOrthogonalPolynomials.grid(Z, Block(j+C.m))
     # θ = [map(_angle,g[1,:]); 0]
     # [permutedims(RadialCoordinate.(1,θ)); g g[:,1]; permutedims(RadialCoordinate.(0,θ))][:,1:end-1]

@@ -21,21 +21,22 @@ end
 
 function FiniteContinuousZernikeMode(N::Int, points::AbstractVector{T}, m::Int, j::Int) where {T}
     K = length(points)-1
+    κ = first(points[1]) ≈ 0 ? 2 : 1
     ρs = []
-    for k = 1:length(points)-1
+    for k = κ:length(points)-1
         α, β = convert(T, first(points[k])), convert(T, last(points[k+1]))
         append!(ρs, [α / β])
     end
 
     ts = inv.(one(T) .- ρs.^2)
     Ls = _ann2element_via_lowering.(ts, m)
-    L₁₁ = NTuple{K, AbstractMatrix}(first.(Ls))
-    L₀₁ = NTuple{K, AbstractMatrix}([Ls[k][2] for k in 1:K])
-    L₁₀ = NTuple{K, AbstractMatrix}(last.(Ls))
+    L₁₁ = NTuple{K+1-κ, AbstractMatrix}(first.(Ls))
+    L₀₁ = NTuple{K+1-κ, AbstractMatrix}([Ls[k][2] for k in 1:K+1-κ])
+    L₁₀ = NTuple{K+1-κ, AbstractMatrix}(last.(Ls))
 
     Z = ZernikeAnnulus{T}.(ρs,1,1)
     D = (Z .\ (Laplacian.(axes.(Z,1)).*Weighted.(Z)))
-    D = NTuple{K, AbstractMatrix}([Ds.ops[m+1] for Ds in D])
+    D = NTuple{K+1-κ, AbstractMatrix}([Ds.ops[m+1] for Ds in D])
 
     FiniteContinuousZernikeMode(N, points, m, j, L₁₁, L₀₁, L₁₀, D, m+2N) 
 end
@@ -117,13 +118,13 @@ end
 ###
 function _piece_element_matrix(Ms, N::Int, m::Int, points::AbstractVector{T}) where T
     K = length(points)-1
-    M = Hcat(Matrix{T}(Ms[1][1:N, 1:N]), zeros(N,(K-1)*(N-1)))
+    M = Hcat(Matrix{T}(Ms[1][1:N, 1:N]), spzeros(N,(K-1)*(N-1)))
 
     if K > 1
         γs = _getγs(points, m)
         append!(γs, one(T))
         for k in 2:K
-            M = Matrix(Vcat(M, Hcat(zeros(T, N-1, N+(k-2)*(N-1)), Ms[k][2:N, 2:N], zeros(T, N-1, (K-k)*(N-1)))))
+            M = Matrix(Vcat(M, Hcat(zeros(T, N-1, N+(k-2)*(N-1)), Ms[k][2:N, 2:N], spzeros(T, N-1, (K-k)*(N-1)))))
         end
 
         i = first(points) ≈ 0 ? 1 : 2 # disk or annulus?

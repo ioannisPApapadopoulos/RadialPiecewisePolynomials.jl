@@ -29,10 +29,10 @@ end
 # Matrices for lowering to ZernikeAnnulus(0,0) via
 # direct lowering. Less stable, but probably lower complexity.
 function _ann2element_via_lowering(t::T, m::Int) where T
-    Q₀₀ = SemiclassicalJacobi{T}(t, 0, 0, m)
-    Q₀₁ = SemiclassicalJacobi{T}(t, 0, 1, m)
-    Q₁₀ = SemiclassicalJacobi{T}(t, 1, 0, m)
-    Q₁₁ = SemiclassicalJacobi{T}(t, 1, 1, m)
+    Q₀₀ = SemiclassicalJacobi(t, 0, 0, m)
+    Q₀₁ = SemiclassicalJacobi(t, 0, 1, m)
+    Q₁₀ = SemiclassicalJacobi(t, 1, 0, m)
+    Q₁₁ = SemiclassicalJacobi(t, 1, 1, m)
 
     L₁₁ = (Weighted(Q₀₀) \ Weighted(Q₁₁)) / t^2
     L₀₁ = (Weighted(Q₀₀) \ Weighted(Q₀₁)) / t

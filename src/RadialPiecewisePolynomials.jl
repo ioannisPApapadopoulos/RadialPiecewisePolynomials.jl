@@ -2,14 +2,14 @@ module RadialPiecewisePolynomials
 
 using AlgebraicCurveOrthogonalPolynomials, ClassicalOrthogonalPolynomials, ContinuumArrays, DomainSets,
     FastTransforms, LinearAlgebra, MultivariateOrthogonalPolynomials, SemiclassicalOrthogonalPolynomials,
-    StaticArrays, QuasiArrays, FillArrays, LazyArrays, Memoization #, ArrayLayouts#, LazyBandedMatrices#, 
+    StaticArrays, QuasiArrays, FillArrays, LazyArrays, Memoization#, ArrayLayouts#, LazyBandedMatrices#, 
 
 
 import ContinuumArrays: Weight, grid, ℵ₁, ℵ₀, @simplify, ProjectionFactorization, plan_grid_transform, unweighted, weight
 import Base: in, axes, getindex, broadcasted, tail, +, -, *, /, \, convert, OneTo, show, summary, ==, oneto, diff
 import SemiclassicalOrthogonalPolynomials: divmul, HalfWeighted, Interlace
 import MultivariateOrthogonalPolynomials: BlockOneTo, ModalInterlace, BlockRange1, Plan, ModalTrav, ZernikeITransform
-import ClassicalOrthogonalPolynomials: checkpoints, ShuffledR2HC, TransformFactorization, ldiv, paddeddata, jacobimatrix, orthogonalityweight, SetindexInterlace, pad
+import ClassicalOrthogonalPolynomials: checkpoints, ShuffledR2HC, TransformFactorization, ldiv, paddeddata, jacobimatrix, orthogonalityweight, SetindexInterlace, pad, blockedrange
 import LinearAlgebra: eigvals, eigen, isapprox, SymTridiagonal, norm, factorize
 import AlgebraicCurveOrthogonalPolynomials: factorize, ZernikeAnnulusITransform
 import LazyArrays: Vcat
