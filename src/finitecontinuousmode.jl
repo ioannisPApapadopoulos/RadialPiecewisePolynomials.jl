@@ -222,7 +222,12 @@ end
     Ms = [C' * C for C in Cs]
     γs = _getγs(B)
 
-    _arrow_head_matrix(Ms, γs, B.N, 2, first(B.points))
+    M = _arrow_head_matrix(Ms, γs, B.N, 2, first(B.points))
+    if B.N < 4
+        return M[Block.(1:B.N-1), Block.(1:B.N-1)]
+    else
+        return M
+    end
 end
 
 ###

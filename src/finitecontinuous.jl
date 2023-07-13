@@ -10,8 +10,9 @@ end
 FiniteContinuousZernike(N::Int, points::AbstractVector) = FiniteContinuousZernike{Float64}(N, points)
 
 function axes(Z::FiniteContinuousZernike{T}) where T
-    first(Z.points) ≈ 0 && return (Inclusion(last(Z.points)*UnitDisk{T}()), oneto(Z.N*(length(Z.points)-1)-(length(Z.points)-2)))
-    (Inclusion(annulus(first(Z.points), last(Z.points))), oneto(Z.N*(length(Z.points)-1)-(length(Z.points)-2)))
+    first(Z.points) ≈ 0 && return (Inclusion(last(Z.points)*UnitDisk{T}()), blockedrange(Vcat(length(Z.points)-1, Fill(length(Z.points) - 1, Z.N-2))))
+    # (Inclusion(annulus(first(Z.points), last(Z.points))), oneto(Z.N*(length(Z.points)-1)-(length(Z.points)-2)))
+    (Inclusion(annulus(first(Z.points), last(Z.points))), blockedrange(Vcat(length(Z.points), Fill(length(Z.points) - 1, Z.N-2))))
 end
 ==(P::FiniteContinuousZernike, Q::FiniteContinuousZernike) = P.N == Q.N && P.points == Q.points
 
@@ -52,6 +53,7 @@ function _getMs_ms_js(N::Int)
     Ms = ((N + 1 .- ms) .÷ 2); Ms[Ms .<= 2] .= 3
     (Ms, ms, js)
 end
+
 function _getFs(N::Int, points::AbstractVector{T}) where T
     # Ordered list of Fourier modes (ms, js) and correct length for each Fourier mode Ms.
     Ms, ms, js = _getMs_ms_js(N)
@@ -172,12 +174,14 @@ function _bubble2disk_or_ann_all_modes(F::FiniteContinuousZernike, us::AbstractV
         γs = _getγs(points, m)
         append!(γs, one(T))
         if first(points) ≈ 0 && K > 1
-            Us[1:Ms[i],i,1] = [us[i][1]*γs[1]; us[i][2:Ms[i]]]
-            k=2; Us[1:Ms[i],i,k] = [us[i][1]; us[i][Ms[i]+(k-2)*(Ms[i]-1)+1]*γs[k]; us[i][Ms[i]+(k-2)*(Ms[i]-1)+2:Ms[i]+(k-1)*(Ms[i]-1)]]
-            for k = 3:K Us[1:Ms[i],i,k] = [us[i][Ms[i]+(k-3)*(Ms[i]-1)+1]; us[i][Ms[i]+(k-2)*(Ms[i]-1)+1]*γs[k];us[i][Ms[i]+(k-2)*(Ms[i]-1)+2:Ms[i]+(k-1)*(Ms[i]-1)]] end
+            Us[1:Ms[i]-1,i,1] = [us[i][1]*γs[1];us[i][K+1:K:end]]
+            for k = 1:K-1 
+                Us[1:Ms[i],i,k+1] = [us[i][k];us[i][k+1]*γs[k+1];us[i][(K+k+1):K:end]] 
+            end
         else
-            Us[1:Ms[i],i,1] = [us[i][1]; us[i][2]*γs[1]; us[i][3:Ms[i]]]
-            for k = 2:K Us[1:Ms[i],i,k] = [us[i][Ms[i]+(k-3)*(Ms[i]-1)+1]; us[i][Ms[i]+(k-2)*(Ms[i]-1)+1]*γs[k];us[i][Ms[i]+(k-2)*(Ms[i]-1)+2:Ms[i]+(k-1)*(Ms[i]-1)]] end
+            for k = 1:K 
+                Us[1:Ms[i],i,k] = [us[i][k];us[i][k+1]*γs[k];us[i][(K+1+k):K:end]] 
+            end
         end
     end
 
@@ -231,9 +235,6 @@ end
 
 
 ## Error collection
-#######
-### Compute inf-norm errors
-#######
 function _inf_error(K::Int, θs::AbstractVector, rs::AbstractVector, vals::AbstractVector, u::Function)
     vals_ = []
     for k = 1:K
