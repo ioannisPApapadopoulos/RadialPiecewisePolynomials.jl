@@ -288,3 +288,9 @@ function finite_plotvalues(Z::FiniteZernikeBasis{T}, us::AbstractVector) where T
     end
     return (θs, rs, vals)
 end
+
+### Error collection
+function inf_error(Z::FiniteZernikeBasis{T}, θs::AbstractVector, rs::AbstractVector, vals::AbstractVector, u::Function) where T
+    K = lastindex(Z.points)-1
+    _inf_error(K, θs, rs, vals, u)
+end

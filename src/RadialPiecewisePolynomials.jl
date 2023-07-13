@@ -23,7 +23,7 @@ export SVector, Zeros, Ones, Vcat, Derivative, pad, paddeddata, Hcat, RadialCoor
         ContinuousZernikeAnnulusMode,
         zero_dirichlet_bcs!, element_plotvalues,
         finite_plotvalues, inf_error, plot,
-        FiniteContinuousZernikeMode, FiniteContinuousZernike,
+        FiniteContinuousZernikeMode, FiniteContinuousZernike, inf_error,
         FiniteZernikeBasis, ZernikeBasisMode, FiniteZernikeBasisMode,
         ArrowheadMatrix
 

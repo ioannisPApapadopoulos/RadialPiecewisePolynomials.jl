@@ -10,13 +10,13 @@ struct FiniteContinuousZernikeMode{T} <: Basis{T}
     b::Int # Should remove once adaptive expansion has been figured out.
 end
 
-function FiniteContinuousZernikeMode(N::Int, points::AbstractVector{T}, m::Int, j::Int, L₁₁, L₀₁, L₁₀, D, b::Int) where T
-    @assert length(points) > 1 && points == sort(points)
+function FiniteContinuousZernikeMode(N::Int, points::AbstractVector{T}, m::Int, j::Int, L₁₁, L₀₁, L₁₀, D) where T
+    @assert length(points) > 2 && points == sort(points)
     @assert m ≥ 0
     @assert m == 0 ? j == 1 : 0 ≤ j ≤ 1
     K = first(points) ≈ 0 ? length(points)-2 : length(points) - 1
     @assert length(L₁₁) == length(L₀₁) == length(L₁₀) == length(D) == K
-    FiniteContinuousZernikeMode{T}(N, points, m, j, L₁₁, L₀₁, L₁₀, D, b)
+    FiniteContinuousZernikeMode{T}(N, points, m, j, L₁₁, L₀₁, L₁₀, D, m+2N)
 end
 
 function FiniteContinuousZernikeMode(N::Int, points::AbstractVector{T}, m::Int, j::Int) where {T}
@@ -38,14 +38,14 @@ function FiniteContinuousZernikeMode(N::Int, points::AbstractVector{T}, m::Int, 
     D = (Z .\ (Laplacian.(axes.(Z,1)).*Weighted.(Z)))
     D = NTuple{K+1-κ, AbstractMatrix}([Ds.ops[m+1] for Ds in D])
 
-    FiniteContinuousZernikeMode(N, points, m, j, L₁₁, L₀₁, L₁₀, D, m+2N) 
+    FiniteContinuousZernikeMode(N, points, m, j, L₁₁, L₀₁, L₁₀, D)
 end
 
 # FiniteContinuousZernikeMode(points::AbstractVector, m::Int, j::Int, L₁₁, L₀₁, L₁₀, D, b::Int) = FiniteContinuousZernikeMode{Float64}(points, m, j, L₁₁, L₀₁, L₁₀, D, b)
 # FiniteContinuousZernikeMode(points::AbstractVector, m::Int, j::Int, L₁₁, L₀₁, L₁₀, D) = FiniteContinuousZernikeMode{Float64}(points, m, j, L₁₁, L₀₁, L₁₀, D, m+2N)
 
 function axes(Z::FiniteContinuousZernikeMode{T}) where T
-    first(Z.points) ≈ 0 && return (Inclusion(last(Z.points)*UnitDisk{T}()), blockedrange(Vcat(length(Z.points), Fill(length(Z.points) - 1, Z.N-2))))
+    first(Z.points) ≈ 0 && return (Inclusion(last(Z.points)*UnitDisk{T}()), blockedrange(Vcat(length(Z.points)-1, Fill(length(Z.points) - 1, Z.N-2))))
     # (Inclusion(annulus(first(Z.points), last(Z.points))), oneto(Z.N*(length(Z.points)-1)-(length(Z.points)-2)))
     (Inclusion(annulus(first(Z.points), last(Z.points))), blockedrange(Vcat(length(Z.points), Fill(length(Z.points) - 1, Z.N-2))))
 end
@@ -71,6 +71,7 @@ function _getγs(points::AbstractArray{T}, m::Int) where T
     return append!([(one(T)-(points[2]/points[3])^2)*(points[2]/points[3])^m / (sqrt(convert(T,2)^(m+2-iszero(m))/π) * normalizedjacobip(0, 0, m, 1.0))],γ)
 end
 _getγs(F::FiniteContinuousZernikeMode{T}) where T = _getγs(F.points, F.m)
+
 # function getindex(F::FiniteContinuousZernikeMode{T}, xy::StaticVector{2}, j::Int)::T where {T}
 #     points = T.(F.points); K = length(points)-1
 #     N = F.N; m = F.m; j = F.j;
@@ -99,10 +100,15 @@ function ldiv(F::FiniteContinuousZernikeMode{T}, f::AbstractQuasiVector) where T
     Cs = _getCs(F)
     fs = [C \ f.f.(axes(C, 1)) for C in Cs]
 
-    hats = vcat([fs[i][1] for i in 1:K-1], fs[end][1:2])
-
     bubbles = zeros(T, N-2, K)
-    for i in 1:K bubbles[:,i] = fs[i][3:N] end
+    if first(points) ≈ 0
+        hats = vcat([fs[i][1] for i in 2:K-1], fs[end][1:2])
+        bubbles[:,1] = fs[1][2:N-1]
+        for i in 2:K bubbles[:,i] = fs[i][3:N] end
+    else
+        hats = vcat([fs[i][1] for i in 1:K-1], fs[end][1:2])
+        for i in 1:K bubbles[:,i] = fs[i][3:N] end
+    end
 
     pad(append!(hats, vec(bubbles')), axes(F,2))
 end
@@ -111,44 +117,84 @@ end
 ###
 # L2 inner product
 ###
-function _build_top_left_block(Ms, γs::AbstractArray{T}) where T
+
+# Interaction of hats with themselves and other hats
+function _build_top_left_block(Ms, γs::AbstractArray{T}, p::T) where T
     K = length(Ms)
+    if p ≈ 0
+        a = [Ms[1][1,1]]
+        for i in 2:K
+            append!(a, diag(Ms[i][1:2,1:2]))
+        end
 
-    a = []
-    for i in 1:K
-        append!(a, diag(Ms[i][1:2,1:2]))
+        dv = zeros(T, K)
+        dv[1] = a[1]*γs[1]^2 + a[2];
+        dv[end] = a[end];
+
+        for i in 1:K-2 dv[i+1] = a[2i+1]*γs[i+1]^2 + a[2i+2] end
+
+        ev = zeros(T, K-1)
+        γs = vcat(γs, one(T))
+
+        for i in 2:K ev[i-1] = Ms[i][1,2] * γs[i] end
+    else
+        a = []
+        for i in 1:K
+            append!(a, diag(Ms[i][1:2,1:2]))
+        end
+
+        dv = zeros(T, K+1)
+        dv[1] = a[1]; dv[end] = a[end];
+        ev = zeros(T, K)
+        γs = vcat(γs, one(T))
+
+        for i in 1:K-1 dv[i+1] = a[2i]*γs[i]^2 + a[2i+1] end
+        for i in 1:K ev[i] = Ms[i][1,2] * γs[i] end
+
     end
-
-    dv = zeros(T, K+1)
-    dv[1] = a[1]; dv[end] = a[end];
-    ev = zeros(T, K)
-    γs = vcat(γs, one(T))
-
-    for i in 1:K-1 dv[i+1] = a[2i]*γs[i]^2 + a[2i+1] end
-    for i in 1:K ev[i] = Ms[i][1,2] * γs[i] end
-
     Symmetric(BandedMatrix{T}(0=>dv, 1=>ev))
 end
 
-function _build_second_block(Ms, γs::AbstractArray{T}, bs::Int) where T
+# Interaction of the hats with the bubbles
+function _build_second_block(Ms, γs::AbstractArray{T}, bs::Int, p::T) where T
     K = length(Ms)
     γs = vcat(γs, one(T))
     dv, ev = [], []
+
     for j in 1:bs
         append!(dv, [zeros(T, K)])
-        append!(ev, [zeros(T, K)])
-        for i in 1:K
-            dv[j][i] = Ms[i][1,j+2]
-            ev[j][i] = Ms[i][2,j+2] * γs[i]
+        if p ≈ 0
+            append!(ev, [zeros(T, K-1)])
+            dv[j][1] = j == 1 ? Ms[1][1,2] * γs[1] : zero(T)
+            ev[j][1] = Ms[2][1,j+2]
+            for i in 2:K-1
+                dv[j][i] = Ms[i][2,j+2] * γs[i]
+                ev[j][i] = Ms[i+1][1,j+2]
+            end
+            dv[j][K] = Ms[K][2,j+2]
+        else
+            append!(ev, [zeros(T, K)])
+            for i in 1:K
+                dv[j][i] = Ms[i][1,j+2]
+                ev[j][i] = Ms[i][2,j+2] * γs[i]
+            end
         end
     end
-    [BandedMatrix{T}((0=>dv[j], -1=>ev[j]), (K+1, K)) for j in 1:bs]
+    if p ≈ 0
+        return [BandedMatrix{T}(0=>dv[j], 1=>ev[j]) for j in 1:bs]
+    else
+        return [BandedMatrix{T}((0=>dv[j], -1=>ev[j]), (K+1, K)) for j in 1:bs]
+    end
 end
 
-function _build_trailing_bubbles(Ms, γs::AbstractArray{T}, N::Int, bs::Int) where T
+# Interaction of the bubbles with themselves and other bubbles
+function _build_trailing_bubbles(Ms, γs::AbstractArray{T}, N::Int, bs::Int, p::T) where T
     K = length(Ms)
-
-    Mn = [Ms[i][3:N, 3:N] for i in 1:K]
+    if p ≈ 0
+        Mn = vcat([Ms[1][2:N-1,2:N-1]], [Ms[i][3:N, 3:N] for i in 2:K])
+    else
+        Mn = [Ms[i][3:N, 3:N] for i in 1:K]
+    end
     if bs ==  2
         return [Symmetric(BandedMatrix{T}(0=>view(M, band(0)), 1=>view(M, band(1)), 2=>view(M, band(2)))) for M in Mn]
     elseif bs == 1
@@ -158,11 +204,11 @@ function _build_trailing_bubbles(Ms, γs::AbstractArray{T}, N::Int, bs::Int) whe
     end
 end
 
-function _arrow_head_matrix(Ms, γs::AbstractArray{T}, N::Int, bs::Int) where T
-    A = _build_top_left_block(Ms, γs)
-    B = _build_second_block(Ms, γs, bs)
+function _arrow_head_matrix(Ms, γs::AbstractArray{T}, N::Int, bs::Int, p::T) where T
+    A = _build_top_left_block(Ms, γs, p)
+    B = _build_second_block(Ms, γs, bs, p)
     C = BandedMatrix{T, Matrix{T}, Base.OneTo{Int64}}[]
-    D = _build_trailing_bubbles(Ms, γs, N, bs)
+    D = _build_trailing_bubbles(Ms, γs, N, bs, p)
     Symmetric(ArrowheadMatrix{T}(A, B, C, D))
 end
 
@@ -176,7 +222,7 @@ end
     Ms = [C' * C for C in Cs]
     γs = _getγs(B)
 
-    _arrow_head_matrix(Ms, γs, B.N, 2)
+    _arrow_head_matrix(Ms, γs, B.N, 2, first(B.points))
 end
 
 ###
@@ -208,7 +254,7 @@ end
 
     γs = _getγs(F)
 
-    _arrow_head_matrix(Δs, γs, N, 1)
+    _arrow_head_matrix(Δs, γs, N, 1, first(F.points))
 end
 
 # function zero_dirichlet_bcs!(F::FiniteContinuousZernikeMode{T}, Δ::AbstractMatrix{T}, Mf::AbstractVector{T}) where T
@@ -252,9 +298,8 @@ function element_plotvalues(u::ApplyQuasiVector{T,typeof(*),<:Tuple{FiniteContin
     append!(γs, one(T))
 
     if first(points) ≈ 0 && K > 1
-        uc = [pad([u[1]*γs[1];u[2:N]], axes(Cs[1],2))]
-        k=2; append!(uc, [pad([u[1]; u[N+(k-2)*(N-1)+1]*γs[k]; u[N+(k-2)*(N-1)+2:N+(k-1)*(N-1)]], axes(Cs[k],2))]) 
-        for k = 3:K append!(uc, [pad([u[N+(k-3)*(N-1)+1];u[N+(k-2)*(N-1)+1]*γs[k];u[N+(k-2)*(N-1)+2:N+(k-1)*(N-1)]], axes(Cs[k],2))]) end
+        uc = [pad([u[1]*γs[1];u[K+1:K:end]], axes(Cs[1],2))]
+        for k = 1:K-1 append!(uc, [pad([u[k];u[k+1]*γs[k+1];u[(K+k+1):K:end]], axes(Cs[k],2))]) end
     else
         uc = []
         for k = 1:K append!(uc, [pad([u[k];u[k+1]*γs[k];u[(K+1+k):K:end]], axes(Cs[k],2))]) end
@@ -268,4 +313,10 @@ function element_plotvalues(u::ApplyQuasiVector{T,typeof(*),<:Tuple{FiniteContin
     end
     
     return (uc, θs, rs, valss)
+end
+
+### Error collection
+function inf_error(F::FiniteContinuousZernikeMode{T}, θs::AbstractVector, rs::AbstractVector, vals::AbstractVector, u::Function) where T
+    K = lastindex(F.points)-1
+    _inf_error(K, θs, rs, vals, u)
 end

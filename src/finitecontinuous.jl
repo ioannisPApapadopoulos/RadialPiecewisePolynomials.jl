@@ -228,3 +228,21 @@ function finite_plotvalues(F::FiniteContinuousZernike, us::AbstractVector)
     end
     return (θs, rs, vals)
 end
+
+
+## Error collection
+#######
+### Compute inf-norm errors
+#######
+function _inf_error(K::Int, θs::AbstractVector, rs::AbstractVector, vals::AbstractVector, u::Function)
+    vals_ = []
+    for k = 1:K
+        append!(vals_, [abs.(vals[k] - u.(RadialCoordinate.(rs[k],θs[k]')))])
+    end
+    vals_, sum(maximum.(vals_))
+end
+
+function inf_error(F::FiniteContinuousZernike{T}, θs::AbstractVector, rs::AbstractVector, vals::AbstractVector, u::Function) where T
+    K = lastindex(F.points)-1
+    _inf_error(K, θs, rs, vals, u)
+end
