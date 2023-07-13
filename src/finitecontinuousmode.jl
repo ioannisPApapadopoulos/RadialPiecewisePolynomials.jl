@@ -118,13 +118,13 @@ end
 ###
 function _piece_element_matrix(Ms, N::Int, m::Int, points::AbstractVector{T}) where T
     K = length(points)-1
-    M = Hcat(Matrix{T}(Ms[1][1:N, 1:N]), spzeros(N,(K-1)*(N-1)))
+    M = Hcat(Matrix{T}(Ms[1][1:N, 1:N]), zeros(N,(K-1)*(N-1)))
 
     if K > 1
         γs = _getγs(points, m)
         append!(γs, one(T))
         for k in 2:K
-            M = Matrix(Vcat(M, Hcat(zeros(T, N-1, N+(k-2)*(N-1)), Ms[k][2:N, 2:N], spzeros(T, N-1, (K-k)*(N-1)))))
+            M = Matrix(Vcat(M, Hcat(zeros(T, N-1, N+(k-2)*(N-1)), Ms[k][2:N, 2:N], zeros(T, N-1, (K-k)*(N-1)))))
         end
 
         i = first(points) ≈ 0 ? 1 : 2 # disk or annulus?
