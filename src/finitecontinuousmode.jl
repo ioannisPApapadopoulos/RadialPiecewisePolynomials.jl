@@ -276,16 +276,27 @@ end
 #     Mf[N+(K-2)*(N-1)+1]=0;
 # end
 
-function zero_dirichlet_bcs!(F::FiniteContinuousZernikeMode{T}, Δ::AbstractMatrix{T}) where T
+function zero_dirichlet_bcs!(F::FiniteContinuousZernikeMode{T}, Δ::LinearAlgebra.Symmetric{T,<:ArrowheadMatrix{T}}) where T
     points = F.points
     A, B = Δ.data.A.data, Δ.data.B[1]
 
     if !(first(points) ≈  0)
-        A[1,:] .= zero(T); A[:,end] .= zero(T)
+        A[1,:] .= zero(T); A[:,end] .= zero(T); A[1,1] = one(T); A[end,end] = one(T)
         A = Symmetric(A)
-        B[1,:] .= zero(T); B[end,:] .= zero(T)
+        B[1,:] .= zero(T); B[end,:] .= zero(T);
     else
-        return 0.0
+        error("Not implemented.")
+    end
+end
+
+function zero_dirichlet_bcs!(F::FiniteContinuousZernikeMode{T}, Mf::PseudoBlockVector{T}) where T
+    points = F.points
+    K = length(points)-1
+    if !(first(points) ≈  0)
+        Mf[1] = zero(T)
+        Mf[K+1] = zero(T)
+    else
+        error("Not implemented.")
     end
 end
 

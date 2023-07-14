@@ -142,34 +142,6 @@ end
 # L2 inner product matrices
 ####
 
-function _piece_element_matrix_zernike_basis(Ms, N::Int, m::Int, points::AbstractVector{T}) where T
-    K = length(points)-1
-    M = Hcat(Matrix{T}(Ms[1][1:N, 1:N]), zeros(T, N,(K-1)*N))
-
-    if K > 1
-        γs = _getγs(points, m)
-        append!(γs, one(T))
-        for k in 2:K
-            M = Matrix(Vcat(M, Hcat(zeros(T, N-1, N+(k-2)*(N)), Ms[k][2:N, 1:N], zeros(T, N-1, (K-k)*(N)))))
-        end
-
-        i = first(points) ≈ 0 ? 1 : 2 # disk or annulus?
-        M[i, 1:i] *= γs[1] # Convert the left-side hat function coefficients for continuity
-
-        # Right-side of hat function interaction with basis in next element
-        M[i, N+1:N+2] = Ms[2][1,1:2]
-
-        b = min(N, 2)
-        for k in 2:K-1
-            # Convert left-side of hat function coefficients for continuity
-            M[N+(k-2)*(N-1)+1, (k-1)*(N)+1:(k-1)*(N)+b] *= γs[k]
-            # Right-side of hat function interaction with basis in next element
-            M[N+(k-2)*(N-1)+1, (k)*(N)+1:(k)*(N)+b] = Ms[k+1][1,1:2]
-        end
-    end
-    return M
-end
-
 @simplify function *(FT::QuasiAdjoint{<:Any,<:ContinuousZernikeAnnulusElementMode}, Z::ZernikeBasisMode)
     T = promote_type(eltype(FT), eltype(Z))
     F = FT.parent
@@ -301,7 +273,6 @@ end
     γs = _getγs(F)
     Ms = [C' * Z̃ for (C, Z̃) in zip(Cs, Zs)]
 
-    # _piece_element_matrix_zernike_basis(Ms, N, m, points)
     _arrow_head_matrix(F, Z, Ms, γs, F.N, first(F.points))[Block.(1:N-1), :]
 
 end

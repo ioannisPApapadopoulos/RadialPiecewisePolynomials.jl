@@ -149,9 +149,16 @@ end
     [(∇*F)' * (∇*F) for F in Fs]
 end
 
-function zero_dirichlet_bcs!(F::FiniteContinuousZernike{T}, Δ::Vector{Matrix{T}}, Mf::Vector{Vector{T}}) where T
+function zero_dirichlet_bcs!(F::FiniteContinuousZernike{T}, Δ::AbstractVector{<:LinearAlgebra.Symmetric{T,<:ArrowheadMatrix{T}}}) where T
+    @assert length(Δ) == 2*F.N-1
     Fs = _getFs(F.N, F.points)
-    zero_dirichlet_bcs!.(Fs, Δ, Mf)
+    zero_dirichlet_bcs!.(Fs, Δ)
+end
+
+function zero_dirichlet_bcs!(F::FiniteContinuousZernike{T}, Mf::AbstractVector{<:PseudoBlockVector{T}}) where T
+    @assert length(Mf) == 2*F.N-1
+    Fs = _getFs(F.N, F.points)
+    zero_dirichlet_bcs!.(Fs, Mf)
 end
 
 ###
