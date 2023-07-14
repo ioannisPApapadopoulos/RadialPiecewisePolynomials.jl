@@ -211,26 +211,18 @@ end
     end
 end
 
+### Helper functions for building the ArrowheadMatrix
 # Interaction of hats with lowest order Zernike
-function _build_top_left_block(F::FiniteContinuousZernikeMode, Z::FiniteZernikeBasisMode, Ms, γs::AbstractArray{T}, p::T) where T
+function _build_top_left_block(F::FiniteContinuousZernikeMode{T}, Z::FiniteZernikeBasisMode{T}, Ms, γs::AbstractArray{T}, p::T) where T
     K = length(Ms)
     if p ≈ 0
-        # a = [Ms[1][1,1]]
-        # for i in 2:K
-        #     append!(a, diag(Ms[i][1:2,1:2]))
-        # end
+        dv, ev = zeros(T, K), zeros(T,K-1)
+        γs = vcat(γs, one(T))
 
-        # dv = zeros(T, K)
-        # dv[1] = a[1]*γs[1]^2 + a[2];
-        # dv[end] = a[end];
-
-        # for i in 1:K-2 dv[i+1] = a[2i+1]*γs[i+1]^2 + a[2i+2] end
-
-        # ev = zeros(T, K-1)
-        # γs = vcat(γs, one(T))
-
-        # for i in 2:K ev[i-1] = Ms[i][1,2] * γs[i] end
-        error("Not implemented.")
+        dv[1] = Ms[1][1,1] * γs[1]
+        for i in 2:K dv[i] = Ms[i][2,1] * γs[i] end
+        for i in 2:K ev[i-1] = Ms[i][1,1] end
+        return BandedMatrix{T}(0=>dv, 1=>ev)
     else
 
         dv, ev = zeros(T, K), zeros(T,K)
@@ -238,18 +230,30 @@ function _build_top_left_block(F::FiniteContinuousZernikeMode, Z::FiniteZernikeB
 
         for i in 1:K dv[i] = Ms[i][1,1] end
         for i in 1:K ev[i] = Ms[i][2,1] * γs[i] end
-
+        return BandedMatrix{T}((0=>dv, -1=>ev), (K+1, K))
     end
-    BandedMatrix{T}((0=>dv, -1=>ev), (K+1, K))
+
 end
 
 # Interaction of hats with next lower order Zernike
-function _build_second_block(F::FiniteContinuousZernikeMode, Z::FiniteZernikeBasisMode, Ms, γs::AbstractArray{T}, bs::Int, p::T) where T
+function _build_second_block(F::FiniteContinuousZernikeMode{T}, Z::FiniteZernikeBasisMode{T}, Ms, γs::AbstractArray{T}, p::T) where T
     K = length(Ms)
     if p ≈ 0
-        error("Not implemented.")
-    else
+        dv, ev = zeros(T, K), zeros(T,K-1)
+        γs = vcat(γs, one(T))
 
+        dv[1] = Ms[1][1,2] * γs[1]
+        for i in 2:K dv[i] = Ms[i][2,2] * γs[i] end
+        for i in 2:K ev[i-1] = Ms[i][1,2] end
+
+        bdv = zeros(T, K)
+        bdv[1] = Ms[1][2,1]
+        for i in 2:K bdv[i] = Ms[i][3,1] end
+
+        H = [BandedMatrix{T}(0=>dv, 1=>ev), Zeros{T}(K, K)]
+        B = [BandedMatrix{T}(0=>bdv), Zeros{T}(K, K)]
+        return (H, B)
+    else
         dv, ev = zeros(T, K), zeros(T,K)
         γs = vcat(γs, one(T))
 
@@ -259,35 +263,28 @@ function _build_second_block(F::FiniteContinuousZernikeMode, Z::FiniteZernikeBas
         bdv = zeros(T, K)
         for i in 1:K bdv[i] = Ms[i][3,1] end
 
+        H = [BandedMatrix{T}((0=>dv, -1=>ev), (K+1, K)), Zeros{T}(K+1, K)]
+        B = [BandedMatrix{T}(0=>bdv), Zeros{T}(K, K)]
+        return (H, B)
     end
-    H = [BandedMatrix{T}((0=>dv, -1=>ev), (K+1, K)), Zeros{T}(K+1, K)]
-    B = [BandedMatrix{T}(0=>bdv), Zeros{T}(K, K)]
-    (H, B)
+
 end
 
 # Interaction of the bubbles with Zernike
-function _build_trailing_bubbles(F::FiniteContinuousZernikeMode, Z::FiniteZernikeBasisMode, Ms, γs::AbstractArray{T}, N::Int, bs::Int, p::T) where T
+function _build_trailing_bubbles(F::FiniteContinuousZernikeMode{T}, Z::FiniteZernikeBasisMode{T}, Ms, N::Int, p::T) where T
     K = length(Ms)
     if p ≈ 0
-        # Mn = vcat([Ms[1][2:N-1,2:N-1]], [Ms[i][3:N, 3:N] for i in 2:K])
-        error("Not implemented.")
+        Mn = vcat([Ms[1][2:N-1,2:N]], [Ms[i][3:N, 2:N] for i in 2:K])
     else
         Mn = [Ms[i][3:N, 2:N] for i in 1:K]
     end
     return [BandedMatrix{T}(-1=>view(M, band(-1)), 0=>view(M, band(0)), 1=>view(M, band(1))) for M in Mn]
-    # if bs ==  2
-    #     return [BandedMatrix{T}(0=>view(M, band(0)), 2=>view(M, band(2))) for M in Mn]
-    # elseif bs == 1
-    #     return [Symmetric(BandedMatrix{T}(0=>view(M, band(0)), 1=>view(M, band(1)))) for M in Mn]
-    # else
-    #     error("Are you using _build_mass_trailing_bubbles correctly?")
-    # end
 end
 
-function _arrow_head_matrix(F::FiniteContinuousZernikeMode, Z::FiniteZernikeBasisMode, Ms, γs::AbstractArray{T}, N::Int, bs::Int, p::T) where T
+function _arrow_head_matrix(F::FiniteContinuousZernikeMode, Z::FiniteZernikeBasisMode, Ms, γs::AbstractArray{T}, N::Int, p::T) where T
     A = _build_top_left_block(F,Z,Ms, γs, p)
-    (B, C) = _build_second_block(F,Z,Ms, γs, bs, p)
-    D = _build_trailing_bubbles(F,Z,Ms, γs, N, bs, p)
+    B, C = _build_second_block(F,Z,Ms, γs,  p)
+    D = _build_trailing_bubbles(F,Z,Ms, N,  p)
     ArrowheadMatrix{T}(A, B, C, D)
 end
 
@@ -305,7 +302,7 @@ end
     Ms = [C' * Z̃ for (C, Z̃) in zip(Cs, Zs)]
 
     # _piece_element_matrix_zernike_basis(Ms, N, m, points)
-    _arrow_head_matrix(F, Z, Ms, γs, F.N, 2, first(F.points))[Block.(1:N-1), :]
+    _arrow_head_matrix(F, Z, Ms, γs, F.N, first(F.points))[Block.(1:N-1), :]
 
 end
 
