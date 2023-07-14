@@ -262,20 +262,6 @@ end
     _arrow_head_matrix(F, Δs, γs, N, 1, first(F.points))
 end
 
-# function zero_dirichlet_bcs!(F::FiniteContinuousZernikeMode{T}, Δ::AbstractMatrix{T}, Mf::AbstractVector{T}) where T
-#     N, points = F.N, F.points
-#     K = length(points)-1
-    
-#     if !(first(points) ≈  0)
-#         Δ[:,1].=0
-#         Δ[1,:].=0
-#         Δ[1,1]=1.
-#         Mf[1]=0
-#     end
-#     Δ[N+(K-2)*(N-1)+1,:].=0; Δ[:,N+(K-2)*(N-1)+1].=0; Δ[N+(K-2)*(N-1)+1,N+(K-2)*(N-1)+1]=1.;
-#     Mf[N+(K-2)*(N-1)+1]=0;
-# end
-
 function zero_dirichlet_bcs!(F::FiniteContinuousZernikeMode{T}, Δ::LinearAlgebra.Symmetric{T,<:ArrowheadMatrix{T}}) where T
     points = F.points
     A, B = Δ.data.A.data, Δ.data.B[1]
@@ -285,7 +271,9 @@ function zero_dirichlet_bcs!(F::FiniteContinuousZernikeMode{T}, Δ::LinearAlgebr
         A = Symmetric(A)
         B[1,:] .= zero(T); B[end,:] .= zero(T);
     else
-        error("Not implemented.")
+        A[:,end] .= zero(T); A[end,end] = one(T)
+        A = Symmetric(A)
+        B[end,:] .= zero(T);
     end
 end
 
@@ -296,7 +284,7 @@ function zero_dirichlet_bcs!(F::FiniteContinuousZernikeMode{T}, Mf::PseudoBlockV
         Mf[1] = zero(T)
         Mf[K+1] = zero(T)
     else
-        error("Not implemented.")
+        Mf[K] = zero(T)
     end
 end
 
