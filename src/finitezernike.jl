@@ -43,8 +43,8 @@ function FiniteZernikeBasisMode(N::Int, points::AbstractVector{T}, a::Int, b::In
 end
 
 function axes(Z::FiniteZernikeBasisMode{T}) where T
-    first(Z.points) ≈ 0 && return (Inclusion(last(Z.points)*UnitDisk{T}()), oneto(Z.N*(length(Z.points)-1)))
-    (Inclusion(annulus(first(Z.points), last(Z.points))), oneto(Z.N*(length(Z.points)-1)))
+    first(Z.points) ≈ 0 && return (Inclusion(last(Z.points)*UnitDisk{T}()), blockedrange(Fill(length(Z.points) - 1, Z.N-1)))
+    (Inclusion(annulus(first(Z.points), last(Z.points))), blockedrange(Fill(length(Z.points) - 1, Z.N-1)))
 end
 ==(P::FiniteZernikeBasisMode, Q::FiniteZernikeBasisMode) = P.N == Q.N && P.points == Q.points && P.m == Q.m && P.j == Q.j && P.a == Q.a && P.b == Q.b
 
@@ -124,16 +124,16 @@ function ldiv(Z::FiniteZernikeBasis{T}, f::AbstractQuasiVector) where T
     end
     
     c = ModalTrav.(c)
-    cs = Vector{T}[]
+    cs = []
     
     Ms, ms, js = _getMs_ms_js(N)
 
     for i in 1:2N-1
-        u = T[]
+        u = zeros(T, Ms[i], K)
         for k in 1:K
-            append!(u, c[k].matrix[1:Ms[i],i])
+            u[:, k] = c[k].matrix[1:Ms[i],i]
         end
-        append!(cs, [u])
+        append!(cs, [pad(vec(u'), blockedrange(Fill(K, Ms[i])))])
     end
     return cs
 end
@@ -211,6 +211,86 @@ end
     end
 end
 
+# Interaction of hats with lowest order Zernike
+function _build_top_left_block(F::FiniteContinuousZernikeMode, Z::FiniteZernikeBasisMode, Ms, γs::AbstractArray{T}, p::T) where T
+    K = length(Ms)
+    if p ≈ 0
+        # a = [Ms[1][1,1]]
+        # for i in 2:K
+        #     append!(a, diag(Ms[i][1:2,1:2]))
+        # end
+
+        # dv = zeros(T, K)
+        # dv[1] = a[1]*γs[1]^2 + a[2];
+        # dv[end] = a[end];
+
+        # for i in 1:K-2 dv[i+1] = a[2i+1]*γs[i+1]^2 + a[2i+2] end
+
+        # ev = zeros(T, K-1)
+        # γs = vcat(γs, one(T))
+
+        # for i in 2:K ev[i-1] = Ms[i][1,2] * γs[i] end
+        error("Not implemented.")
+    else
+
+        dv, ev = zeros(T, K), zeros(T,K)
+        γs = vcat(γs, one(T))
+
+        for i in 1:K dv[i] = Ms[i][1,1] end
+        for i in 1:K ev[i] = Ms[i][2,1] * γs[i] end
+
+    end
+    BandedMatrix{T}((0=>dv, -1=>ev), (K+1, K))
+end
+
+# Interaction of hats with next lower order Zernike
+function _build_second_block(F::FiniteContinuousZernikeMode, Z::FiniteZernikeBasisMode, Ms, γs::AbstractArray{T}, bs::Int, p::T) where T
+    K = length(Ms)
+    if p ≈ 0
+        error("Not implemented.")
+    else
+
+        dv, ev = zeros(T, K), zeros(T,K)
+        γs = vcat(γs, one(T))
+
+        for i in 1:K dv[i] = Ms[i][1,2] end
+        for i in 1:K ev[i] = Ms[i][2,2] * γs[i] end
+
+        bdv = zeros(T, K)
+        for i in 1:K bdv[i] = Ms[i][3,1] end
+
+    end
+    H = [BandedMatrix{T}((0=>dv, -1=>ev), (K+1, K)), Zeros{T}(K+1, K)]
+    B = [BandedMatrix{T}(0=>bdv), Zeros{T}(K, K)]
+    (H, B)
+end
+
+# Interaction of the bubbles with Zernike
+function _build_trailing_bubbles(F::FiniteContinuousZernikeMode, Z::FiniteZernikeBasisMode, Ms, γs::AbstractArray{T}, N::Int, bs::Int, p::T) where T
+    K = length(Ms)
+    if p ≈ 0
+        # Mn = vcat([Ms[1][2:N-1,2:N-1]], [Ms[i][3:N, 3:N] for i in 2:K])
+        error("Not implemented.")
+    else
+        Mn = [Ms[i][3:N, 2:N] for i in 1:K]
+    end
+    return [BandedMatrix{T}(-1=>view(M, band(-1)), 0=>view(M, band(0)), 1=>view(M, band(1))) for M in Mn]
+    # if bs ==  2
+    #     return [BandedMatrix{T}(0=>view(M, band(0)), 2=>view(M, band(2))) for M in Mn]
+    # elseif bs == 1
+    #     return [Symmetric(BandedMatrix{T}(0=>view(M, band(0)), 1=>view(M, band(1)))) for M in Mn]
+    # else
+    #     error("Are you using _build_mass_trailing_bubbles correctly?")
+    # end
+end
+
+function _arrow_head_matrix(F::FiniteContinuousZernikeMode, Z::FiniteZernikeBasisMode, Ms, γs::AbstractArray{T}, N::Int, bs::Int, p::T) where T
+    A = _build_top_left_block(F,Z,Ms, γs, p)
+    (B, C) = _build_second_block(F,Z,Ms, γs, bs, p)
+    D = _build_trailing_bubbles(F,Z,Ms, γs, N, bs, p)
+    ArrowheadMatrix{T}(A, B, C, D)
+end
+
 @simplify function *(FT::QuasiAdjoint{<:Any,<:FiniteContinuousZernikeMode}, Z::FiniteZernikeBasisMode)
     T = promote_type(eltype(FT), eltype(Z))
     F = FT.parent
@@ -221,9 +301,11 @@ end
     K = length(points)-1
     Cs = _getCs(F)
     Zs = _getZs(Z)
+    γs = _getγs(F)
     Ms = [C' * Z̃ for (C, Z̃) in zip(Cs, Zs)]
 
-    _piece_element_matrix_zernike_basis(Ms, N, m, points)
+    # _piece_element_matrix_zernike_basis(Ms, N, m, points)
+    _arrow_head_matrix(F, Z, Ms, γs, F.N, 2, first(F.points))[Block.(1:N-1), :]
 
 end
 
@@ -256,7 +338,7 @@ function _bubble2disk_or_ann_all_modes(Z::FiniteZernikeBasis{T}, us::AbstractVec
 
     for i in 1:2N-1
         for k = 1:K 
-            Us[1:Ms[i],i,k] = us[i][(k-1)*Ms[i]+1:k*Ms[i]]
+            Us[1:Ms[i],i,k] = us[i][k:K:end]
         end
     end
     [], Us

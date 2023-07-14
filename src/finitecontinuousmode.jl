@@ -119,7 +119,7 @@ end
 ###
 
 # Interaction of hats with themselves and other hats
-function _build_top_left_block(Ms, γs::AbstractArray{T}, p::T) where T
+function _build_top_left_block(F::FiniteContinuousZernikeMode, Ms, γs::AbstractArray{T}, p::T) where T
     K = length(Ms)
     if p ≈ 0
         a = [Ms[1][1,1]]
@@ -156,7 +156,7 @@ function _build_top_left_block(Ms, γs::AbstractArray{T}, p::T) where T
 end
 
 # Interaction of the hats with the bubbles
-function _build_second_block(Ms, γs::AbstractArray{T}, bs::Int, p::T) where T
+function _build_second_block(F::FiniteContinuousZernikeMode, Ms, γs::AbstractArray{T}, bs::Int, p::T) where T
     K = length(Ms)
     γs = vcat(γs, one(T))
     dv, ev = [], []
@@ -188,7 +188,7 @@ function _build_second_block(Ms, γs::AbstractArray{T}, bs::Int, p::T) where T
 end
 
 # Interaction of the bubbles with themselves and other bubbles
-function _build_trailing_bubbles(Ms, γs::AbstractArray{T}, N::Int, bs::Int, p::T) where T
+function _build_trailing_bubbles(F::FiniteContinuousZernikeMode, Ms, γs::AbstractArray{T}, N::Int, bs::Int, p::T) where T
     K = length(Ms)
     if p ≈ 0
         Mn = vcat([Ms[1][2:N-1,2:N-1]], [Ms[i][3:N, 3:N] for i in 2:K])
@@ -204,11 +204,11 @@ function _build_trailing_bubbles(Ms, γs::AbstractArray{T}, N::Int, bs::Int, p::
     end
 end
 
-function _arrow_head_matrix(Ms, γs::AbstractArray{T}, N::Int, bs::Int, p::T) where T
-    A = _build_top_left_block(Ms, γs, p)
-    B = _build_second_block(Ms, γs, bs, p)
+function _arrow_head_matrix(F::FiniteContinuousZernikeMode, Ms, γs::AbstractArray{T}, N::Int, bs::Int, p::T) where T
+    A = _build_top_left_block(F,Ms, γs, p)
+    B = _build_second_block(F,Ms, γs, bs, p)
     C = BandedMatrix{T, Matrix{T}, Base.OneTo{Int64}}[]
-    D = _build_trailing_bubbles(Ms, γs, N, bs, p)
+    D = _build_trailing_bubbles(F,Ms, γs, N, bs, p)
     Symmetric(ArrowheadMatrix{T}(A, B, C, D))
 end
 
@@ -222,7 +222,7 @@ end
     Ms = [C' * C for C in Cs]
     γs = _getγs(B)
 
-    M = _arrow_head_matrix(Ms, γs, B.N, 2, first(B.points))
+    M = _arrow_head_matrix(B, Ms, γs, B.N, 2, first(B.points))
     if B.N < 4
         return M[Block.(1:B.N-1), Block.(1:B.N-1)]
     else
@@ -259,7 +259,7 @@ end
 
     γs = _getγs(F)
 
-    _arrow_head_matrix(Δs, γs, N, 1, first(F.points))
+    _arrow_head_matrix(F, Δs, γs, N, 1, first(F.points))
 end
 
 # function zero_dirichlet_bcs!(F::FiniteContinuousZernikeMode{T}, Δ::AbstractMatrix{T}, Mf::AbstractVector{T}) where T

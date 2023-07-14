@@ -138,7 +138,7 @@ function ldiv(C::ContinuousZernikeAnnulusElementMode{T}, f::AbstractQuasiVector)
     c̃ = c̃.matrix[:, 2*C.m + C.j]
     # Truncate machine error tail
     Ñ = findall(x->abs(x) > 2*eps(T), c̃)
-    c̃ = isempty(Ñ) ? c̃[1:3] : c̃[1:Ñ[end]+min(5, length(c̃)-Ñ[end])]
+    c̃ = isempty(Ñ) ? Zeros{T}(3) : c̃[1:Ñ[end]+min(5, length(c̃)-Ñ[end])]
     N = length(c̃) # degree
     
     t = inv(one(T)-ρ^2)
