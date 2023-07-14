@@ -27,10 +27,11 @@ export SVector, Zeros, Ones, Vcat, Derivative, pad, paddeddata, Hcat, RadialCoor
         FiniteZernikeBasis, ZernikeBasisMode, FiniteZernikeBasisMode,
         ArrowheadMatrix
 
+include("arrowhead.jl")
 include("diskelement.jl")
 include("annuluselement.jl")
 include("finitecontinuousmode.jl")
 include("finitecontinuous.jl")
 include("finitezernike.jl")
-include("arrowhead.jl")
+
 end # module
