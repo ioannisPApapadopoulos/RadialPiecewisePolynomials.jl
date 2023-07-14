@@ -10,8 +10,9 @@ end
 FiniteContinuousZernike(N::Int, points::AbstractVector) = FiniteContinuousZernike{Float64}(N, points)
 
 function axes(Z::FiniteContinuousZernike{T}) where T
-    first(Z.points) ≈ 0 && return (Inclusion(last(Z.points)*UnitDisk{T}()), oneto(Z.N*(length(Z.points)-1)-(length(Z.points)-2)))
-    (Inclusion(annulus(first(Z.points), last(Z.points))), oneto(Z.N*(length(Z.points)-1)-(length(Z.points)-2)))
+    first(Z.points) ≈ 0 && return (Inclusion(last(Z.points)*UnitDisk{T}()), blockedrange(Vcat(length(Z.points)-1, Fill(length(Z.points) - 1, Z.N-2))))
+    # (Inclusion(annulus(first(Z.points), last(Z.points))), oneto(Z.N*(length(Z.points)-1)-(length(Z.points)-2)))
+    (Inclusion(annulus(first(Z.points), last(Z.points))), blockedrange(Vcat(length(Z.points), Fill(length(Z.points) - 1, Z.N-2))))
 end
 ==(P::FiniteContinuousZernike, Q::FiniteContinuousZernike) = P.N == Q.N && P.points == Q.points
 
@@ -52,6 +53,7 @@ function _getMs_ms_js(N::Int)
     Ms = ((N + 1 .- ms) .÷ 2); Ms[Ms .<= 2] .= 3
     (Ms, ms, js)
 end
+
 function _getFs(N::Int, points::AbstractVector{T}) where T
     # Ordered list of Fourier modes (ms, js) and correct length for each Fourier mode Ms.
     Ms, ms, js = _getMs_ms_js(N)
@@ -147,9 +149,16 @@ end
     [(∇*F)' * (∇*F) for F in Fs]
 end
 
-function zero_dirichlet_bcs!(F::FiniteContinuousZernike{T}, Δ::Vector{Matrix{T}}, Mf::Vector{Vector{T}}) where T
+function zero_dirichlet_bcs!(F::FiniteContinuousZernike{T}, Δ::AbstractVector{<:LinearAlgebra.Symmetric{T,<:ArrowheadMatrix{T}}}) where T
+    @assert length(Δ) == 2*F.N-1
     Fs = _getFs(F.N, F.points)
-    zero_dirichlet_bcs!.(Fs, Δ, Mf)
+    zero_dirichlet_bcs!.(Fs, Δ)
+end
+
+function zero_dirichlet_bcs!(F::FiniteContinuousZernike{T}, Mf::AbstractVector{<:PseudoBlockVector{T}}) where T
+    @assert length(Mf) == 2*F.N-1
+    Fs = _getFs(F.N, F.points)
+    zero_dirichlet_bcs!.(Fs, Mf)
 end
 
 ###
@@ -172,12 +181,14 @@ function _bubble2disk_or_ann_all_modes(F::FiniteContinuousZernike, us::AbstractV
         γs = _getγs(points, m)
         append!(γs, one(T))
         if first(points) ≈ 0 && K > 1
-            Us[1:Ms[i],i,1] = [us[i][1]*γs[1]; us[i][2:Ms[i]]]
-            k=2; Us[1:Ms[i],i,k] = [us[i][1]; us[i][Ms[i]+(k-2)*(Ms[i]-1)+1]*γs[k]; us[i][Ms[i]+(k-2)*(Ms[i]-1)+2:Ms[i]+(k-1)*(Ms[i]-1)]]
-            for k = 3:K Us[1:Ms[i],i,k] = [us[i][Ms[i]+(k-3)*(Ms[i]-1)+1]; us[i][Ms[i]+(k-2)*(Ms[i]-1)+1]*γs[k];us[i][Ms[i]+(k-2)*(Ms[i]-1)+2:Ms[i]+(k-1)*(Ms[i]-1)]] end
+            Us[1:Ms[i]-1,i,1] = [us[i][1]*γs[1];us[i][K+1:K:end]]
+            for k = 1:K-1 
+                Us[1:Ms[i],i,k+1] = [us[i][k];us[i][k+1]*γs[k+1];us[i][(K+k+1):K:end]] 
+            end
         else
-            Us[1:Ms[i],i,1] = [us[i][1]; us[i][2]*γs[1]; us[i][3:Ms[i]]]
-            for k = 2:K Us[1:Ms[i],i,k] = [us[i][Ms[i]+(k-3)*(Ms[i]-1)+1]; us[i][Ms[i]+(k-2)*(Ms[i]-1)+1]*γs[k];us[i][Ms[i]+(k-2)*(Ms[i]-1)+2:Ms[i]+(k-1)*(Ms[i]-1)]] end
+            for k = 1:K 
+                Us[1:Ms[i],i,k] = [us[i][k];us[i][k+1]*γs[k];us[i][(K+1+k):K:end]] 
+            end
         end
     end
 
@@ -227,4 +238,19 @@ function finite_plotvalues(F::FiniteContinuousZernike, us::AbstractVector)
         append!(θs, [θ]); append!(rs, [r]); append!(vals, [val])
     end
     return (θs, rs, vals)
+end
+
+
+## Error collection
+function _inf_error(K::Int, θs::AbstractVector, rs::AbstractVector, vals::AbstractVector, u::Function)
+    vals_ = []
+    for k = 1:K
+        append!(vals_, [abs.(vals[k] - u.(RadialCoordinate.(rs[k],θs[k]')))])
+    end
+    vals_, sum(maximum.(vals_))
+end
+
+function inf_error(F::FiniteContinuousZernike{T}, θs::AbstractVector, rs::AbstractVector, vals::AbstractVector, u::Function) where T
+    K = lastindex(F.points)-1
+    _inf_error(K, θs, rs, vals, u)
 end

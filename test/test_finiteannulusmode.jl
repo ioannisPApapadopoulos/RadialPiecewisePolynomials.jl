@@ -29,7 +29,7 @@ f1s(xy) = exp(-first(xy)^2-last(xy)^2) * sqrt(first(xy)^2+last(xy)^2)*sin(atan(l
         end
     end
 
-    @testset "mass & differentiation matrices" begin
+    @testset "expansion & mass & differentiation matrices" begin
         Memoization.empty_all_caches!()
 
         ρ = 0.2
@@ -39,31 +39,40 @@ f1s(xy) = exp(-first(xy)^2-last(xy)^2) * sqrt(first(xy)^2+last(xy)^2)*sin(atan(l
         # Just annuli elements
         F = FiniteContinuousZernikeMode(N, points, 0, 1)
         fc = F \ f0.(axes(F,1))
+        (uc, θs, rs, vals) = element_plotvalues(F*fc)
+        vals_, err = inf_error(F, θs, rs, vals, f0)
+        @test err < 1e-9
         M = F' * F
         @test size(M) == (K*N-(K-1), K*N-(K-1))
         ∇ = Derivative(axes(F,1)); Δ = (∇*F)' * (∇*F)
         @test size(Δ) == (K*N-(K-1), K*N-(K-1))
-        @test fc' * M * fc ≈  π/2 * (exp(-2*0.2^2) - exp(-2))
-        @test fc' * Δ * fc ≈  1.856554980031349
+        @test fc' * (M * fc) ≈  π/2 * (exp(-2*0.2^2) - exp(-2))
+        @test fc' * (Δ * fc) ≈  1.856554980031349
 
         F = FiniteContinuousZernikeMode(N, points, 1, 0)
         fc = F \ f1s.(axes(F,1))
+        (uc, θs, rs, vals) = element_plotvalues(F*fc)
+        vals_, err = inf_error(F, θs, rs, vals, f1s)
+        @test err < 1e-9
         M = F' * F
         @test size(M) == (K*N-(K-1), K*N-(K-1))
         ∇ = Derivative(axes(F,1)); Δ = (∇*F)' * (∇*F)
         @test size(Δ) == (K*N-(K-1), K*N-(K-1))
-        @test fc' * M * fc ≈ 0.2320693725039186
-        @test fc' * Δ * fc ≈ 0.816915357578546
+        @test fc' * (M * fc) ≈ 0.2320693725039186
+        @test fc' * (Δ * fc) ≈ 0.816915357578546
 
         Memoization.empty_all_caches!()
         F = FiniteContinuousZernikeMode(N, points, 6, 1)
         fc = F \ f6.(axes(F,1))
+        (uc, θs, rs, vals) = element_plotvalues(F*fc)
+        vals_, err = inf_error(F, θs, rs, vals, f6)
+        @test err < 1e-9
         M = F' * F
         @test size(M) == (K*N-(K-1), K*N-(K-1))
         ∇ = Derivative(axes(F,1)); Δ = (∇*F)' * (∇*F)
         @test size(Δ) == (K*N-(K-1), K*N-(K-1))
-        @test fc' * M * fc ≈ 0.04005947846778158
-        @test fc' * Δ * fc ≈ 2.686674285690333
+        @test fc' * (M * fc) ≈ 0.04005947846778158
+        @test fc' * (Δ * fc) ≈ 2.686674285690333
 
         # disk + annuli elements
         N = 100; points = [0.0; 0.5; 0.8; 1.0]
@@ -71,31 +80,40 @@ f1s(xy) = exp(-first(xy)^2-last(xy)^2) * sqrt(first(xy)^2+last(xy)^2)*sin(atan(l
 
         F = FiniteContinuousZernikeMode(N, points, 0, 1)
         fc = F \ f0.(axes(F,1))
+        (uc, θs, rs, vals) = element_plotvalues(F*fc)
+        vals_, err = inf_error(F, θs, rs, vals, f0)
+        @test err < 1e-9
         M = F' * F
-        @test size(M) == (K*N-(K-1), K*N-(K-1))
+        @test size(M) == (K*(N-1), K*(N-1))
         ∇ = Derivative(axes(F,1)); Δ = (∇*F)' * (∇*F)
-        @test size(Δ) == (K*N-(K-1), K*N-(K-1))
-        @test fc' * M * fc ≈  π/2 * (1.0 - exp(-2))
-        @test fc' * Δ * fc ≈ 1.866087658826886
+        @test size(Δ) == (K*(N-1), K*(N-1))
+        @test fc' * (M * fc) ≈  π/2 * (1.0 - exp(-2))
+        @test fc' * (Δ * fc) ≈ 1.866087658826886
 
         F = FiniteContinuousZernikeMode(N, points, 1, 0)
         fc = F \ f1s.(axes(F,1))
+        (uc, θs, rs, vals) = element_plotvalues(F*fc)
+        vals_, err = inf_error(F, θs, rs, vals, f1s)
+        @test err < 1e-9
         M = F' * F
-        @test size(M) == (K*N-(K-1), K*N-(K-1))
+        @test size(M) == (K*(N-1), K*(N-1))
         ∇ = Derivative(axes(F,1)); Δ = (∇*F)' * (∇*F)
-        @test size(Δ) == (K*N-(K-1), K*N-(K-1))
-        @test fc' * M * fc ≈ 0.233260957353361
-        @test fc' * Δ * fc ≈ 0.933043829413443
+        @test size(Δ) == (K*(N-1), K*(N-1))
+        @test fc' * (M * fc) ≈ 0.233260957353361
+        @test fc' * (Δ * fc) ≈ 0.933043829413443
 
         Memoization.empty_all_caches!()
         F = FiniteContinuousZernikeMode(N, points, 6, 1)
         fc = F \ f6.(axes(F,1))
+        (uc, θs, rs, vals) = element_plotvalues(F*fc)
+        vals_, err = inf_error(F, θs, rs, vals, f6)
+        @test err < 1e-9
         M = F' * F
-        @test size(M) == (K*N-(K-1), K*N-(K-1))
+        @test size(M) == (K*(N-1), K*(N-1))
         ∇ = Derivative(axes(F,1)); Δ = (∇*F)' * (∇*F)
-        @test size(Δ) == (K*N-(K-1), K*N-(K-1))
-        @test fc' * M * fc ≈ 0.04005947850206709
-        @test fc' * Δ * fc ≈ 2.686674356967118
+        @test size(Δ) == (K*(N-1), K*(N-1))
+        @test fc' * (M * fc) ≈ 0.04005947850206709
+        @test fc' * (Δ * fc) ≈ 2.686674356967118
     end
 
 end

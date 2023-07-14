@@ -2,7 +2,7 @@
 
 julia_version = "1.9.2"
 manifest_format = "2.0"
-project_hash = "be06c9c30bf42e0474dd2f479a958a82e2741c67"
+project_hash = "755a41e03b5a25065ee585032dbb3963e59ae22c"
 
 [[deps.AbstractFFTs]]
 deps = ["LinearAlgebra"]
@@ -37,9 +37,9 @@ uuid = "56f22d72-fd6d-98f1-02f0-08ddc0907c33"
 
 [[deps.BandedMatrices]]
 deps = ["ArrayLayouts", "FillArrays", "LinearAlgebra", "PrecompileTools", "SparseArrays"]
-git-tree-sha1 = "3c63ab5fb851444fb018b97883cfd79ae044e888"
+git-tree-sha1 = "206e78eb10c9aaee4e73962b1cbd0ecf688d4b49"
 uuid = "aae01518-5342-5314-be14-df237901396f"
-version = "0.17.29"
+version = "0.17.30"
 
 [[deps.Base64]]
 uuid = "2a0f44e3-6c83-55bd-87e4-b1978d98bd5f"
@@ -52,9 +52,9 @@ version = "0.16.35"
 
 [[deps.BlockBandedMatrices]]
 deps = ["ArrayLayouts", "BandedMatrices", "BlockArrays", "FillArrays", "LinearAlgebra", "MatrixFactorizations", "SparseArrays", "Statistics"]
-git-tree-sha1 = "00e0fedabdf8b6da7d6ee9df624ab7d1c10897af"
+git-tree-sha1 = "edcae60b22a8a6e138b75622a8b50c3f2e9d61ee"
 uuid = "ffab5731-97b5-5995-9138-79e8c1846df0"
-version = "0.12.0"
+version = "0.12.1"
 
 [[deps.Calculus]]
 deps = ["LinearAlgebra"]

@@ -36,7 +36,8 @@ D = Derivative(axes(F,1))
 Δ = (D*F)' * (D*F) # list of stiffness matrices for each Fourier mode
 
 Mf = (F'*Z) .* fz # right-hand side
-zero_dirichlet_bcs!(F, Δ, Mf) # bcs
+zero_dirichlet_bcs!(F, Δ) # bcs
+zero_dirichlet_bcs!(F, Mf) # bcs
 
 # Solve over each Fourier mode seperately
 u = Δ .\ Mf
