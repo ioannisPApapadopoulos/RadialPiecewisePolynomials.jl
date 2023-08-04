@@ -31,3 +31,11 @@ function plot(Z::FiniteZernikeBasis{T}, θs::AbstractVector, rs::AbstractVector,
     K = lastindex(Z.points)-1
     _plot(K, θs, rs, vals)
 end
+
+function plot(C::ContinuousZernikeAnnulusElementMode{T}, θs::AbstractVector, rs::AbstractVector, vals::AbstractVector) where T
+    _plot(1, θs, rs, vals)
+end
+
+function plot(C::ContinuousZernikeElementMode{T}, θs::AbstractVector, rs::AbstractVector, vals::AbstractVector) where T
+    _plot(1, θs, rs, vals)
+end

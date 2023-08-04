@@ -224,9 +224,11 @@ end
 
     M = _arrow_head_matrix(B, Ms, γs, B.N, 2, first(B.points))
     if B.N < 4
-        return M[Block.(1:B.N-1), Block.(1:B.N-1)]
+        return _arrow_head_matrix(B, Ms, γs, B.N, 1, first(B.points))
+        # return M[Block.(1:B.N-1), Block.(1:B.N-1)]
     else
-        return M
+        return _arrow_head_matrix(B, Ms, γs, B.N, 2, first(B.points))
+        # return M
     end
 end
 
@@ -262,7 +264,7 @@ end
     _arrow_head_matrix(F, Δs, γs, N, 1, first(F.points))
 end
 
-function zero_dirichlet_bcs!(F::FiniteContinuousZernikeMode{T}, Δ::LinearAlgebra.Symmetric{T,<:ArrowheadMatrix{T}}) where T
+function zero_dirichlet_bcs!(F::FiniteContinuousZernikeMode{T}, Δ::LinearAlgebra.Symmetric{T,<:AbstractMatrix{T}}) where T
     points = F.points
     A, B = Δ.data.A.data, Δ.data.B[1]
 

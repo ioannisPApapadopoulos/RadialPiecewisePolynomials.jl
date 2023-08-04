@@ -1,13 +1,15 @@
 struct FiniteContinuousZernike{T, N<:Int, P<:AbstractVector} <: Basis{T}
     N::N
     points::P
+    Fs::Tuple{Vararg{FiniteContinuousZernikeMode}}
 end
 
-function FiniteContinuousZernike{T}(N::Int, points::AbstractVector) where {T}
+function FiniteContinuousZernike{T}(N::Int, points::AbstractVector, Fs::Tuple{Vararg{FiniteContinuousZernikeMode}}) where {T}
     @assert length(points) > 1 && points == sort(points)
-    FiniteContinuousZernike{T, Int, typeof(points)}(N, points)
+    @assert length(Fs) == 2N-1
+    FiniteContinuousZernike{T, Int, typeof(points)}(N, points, Fs)
 end
-FiniteContinuousZernike(N::Int, points::AbstractVector) = FiniteContinuousZernike{Float64}(N, points)
+FiniteContinuousZernike(N::Int, points::AbstractVector) = FiniteContinuousZernike{Float64}(N, points, Tuple(_getFs(N, points)))
 
 function axes(Z::FiniteContinuousZernike{T}) where T
     first(Z.points) ≈ 0 && return (Inclusion(last(Z.points)*UnitDisk{T}()), blockedrange(Vcat(length(Z.points)-1, Fill(length(Z.points) - 1, Z.N-2))))
@@ -104,7 +106,7 @@ function ldiv(F::FiniteContinuousZernike{V}, f::AbstractQuasiVector) where V
     T = V
     N = F.N; points = T.(F.points)
 
-    Fs = _getFs(N, points)
+    Fs = F.Fs
     [F \ f.f.(axes(F, 1)) for F in Fs]
 end
 
@@ -115,9 +117,7 @@ end
 @simplify function *(A::QuasiAdjoint{<:Any,<:FiniteContinuousZernike}, B::FiniteContinuousZernike)
     T = promote_type(eltype(A), eltype(B))
     @assert A' == B
-    points = T.(B.points);
-    N = B.N;
-    Fs = _getFs(N, points)
+    Fs = B.Fs
     [F' * F for F in Fs]
 end
 
@@ -142,22 +142,29 @@ end
 @simplify function *(A::QuasiAdjoint{<:Any,<:GradientFiniteContinuousZernike}, B::GradientFiniteContinuousZernike)
     T = promote_type(eltype(A), eltype(B))
     @assert A' == B
-    points = T.(B.F.points);
-    N = B.F.N;
-    Fs = _getFs(N, points)
+    # points = T.(B.F.points);
+    # N = B.F.N;
+    Fs = B.F.Fs
     ∇ = Derivative(axes(Fs[1],1))
     [(∇*F)' * (∇*F) for F in Fs]
 end
 
-function zero_dirichlet_bcs!(F::FiniteContinuousZernike{T}, Δ::AbstractVector{<:LinearAlgebra.Symmetric{T,<:ArrowheadMatrix{T}}}) where T
+# function zero_dirichlet_bcs!(F::FiniteContinuousZernike{T}, Δ::AbstractVector{<:LinearAlgebra.Symmetric{T,<:ArrowheadMatrix{T}}}) where T
+#     @assert length(Δ) == 2*F.N-1
+#     Fs = _getFs(F.N, F.points)
+#     zero_dirichlet_bcs!.(Fs, Δ)
+# end
+
+function zero_dirichlet_bcs!(F::FiniteContinuousZernike{T}, Δ::AbstractVector{<:AbstractMatrix{T}}) where T
     @assert length(Δ) == 2*F.N-1
-    Fs = _getFs(F.N, F.points)
+    # @assert Δ[1] isa LinearAlgebra.Symmetric{T, <:ArrowheadMatrix{T}}
+    Fs = F.Fs #_getFs(F.N, F.points)
     zero_dirichlet_bcs!.(Fs, Δ)
 end
 
 function zero_dirichlet_bcs!(F::FiniteContinuousZernike{T}, Mf::AbstractVector{<:PseudoBlockVector{T}}) where T
     @assert length(Mf) == 2*F.N-1
-    Fs = _getFs(F.N, F.points)
+    Fs = F.Fs #_getFs(F.N, F.points)
     zero_dirichlet_bcs!.(Fs, Mf)
 end
 
@@ -193,7 +200,7 @@ function _bubble2disk_or_ann_all_modes(F::FiniteContinuousZernike, us::AbstractV
     end
 
     Ũs = zeros(T, (Ñ+1)÷2,2Ñ-1,K)
-    Fs = _getFs(N, points)
+    Fs = F.Fs #_getFs(N, points)
 
     for k in 1:K
         if k == 1 && first(points) ≈ 0
