@@ -1,7 +1,7 @@
 using Revise, RadialPiecewisePolynomials
 using PyPlot
 import ForwardDiff: derivative
-include("../src/plots.jl") # Helper functions for plotting (do not want to compile PyPlot with RadialPiecewisePolynomials)
+include("../src/plotting/plots.jl") # Helper functions for plotting (do not want to compile PyPlot with RadialPiecewisePolynomials)
 
 c1 = -10; c2 = 0; c3=0.6
 function ua(x, y)
