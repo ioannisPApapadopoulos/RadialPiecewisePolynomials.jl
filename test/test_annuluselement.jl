@@ -1,5 +1,5 @@
 using Test, RadialPiecewisePolynomials, LinearAlgebra
-using ClassicalOrthogonalPolynomials, SemiclassicalOrthogonalPolynomials, AlgebraicCurveOrthogonalPolynomials
+using ClassicalOrthogonalPolynomials, SemiclassicalOrthogonalPolynomials, AnnuliOrthogonalPolynomials
 using Memoization
 import RadialPiecewisePolynomials: ModalTrav
 

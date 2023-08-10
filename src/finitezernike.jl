@@ -159,7 +159,7 @@ end
         jw = _sum_semiclassicaljacobiweight(t,0,0,m)
         m₀ = convert(T,π) / ( t^(one(T) + m) ) * jw
         m₀ = m == 0 ? m₀ : m₀ / T(2)
-        Vcat(Hcat(β^2*m₀*L₁₀[:,1], β^2*m₀*L₀₁[:,1])', β^2*m₀*L₁₁')
+        Vcat(Hcat(β^2*m₀*view(L₁₀,:,1), β^2*m₀*view(L₀₁,:,1))', β^2*m₀*L₁₁')
     else
         error("L²-inner product between ContinuousZernikeAnnulusElementMode and ZernikeBasisMode not implemented for parameters Z.a = $a and Z.b = $b")
     end
@@ -321,14 +321,14 @@ function finite_plotvalues(Z::FiniteZernikeBasis{T}, us::AbstractVector) where T
     for k in 1:K
         if k == 1 && first(points) ≈ 0
             ρ = points[2]
-            g = scalegrid(AlgebraicCurveOrthogonalPolynomials.grid(Zs[k], Block(2N)), ρ)
+            g = scalegrid(AnnuliOrthogonalPolynomials.grid(Zs[k], Block(2N)), ρ)
             FT = ZernikeITransform{T}(2N, Zs[k].a, Zs[k].b)
             val = FT * pad(ModalTrav(Ũs[:,:,k]),axes(Zs[k],2))[Block.(OneTo(2N))]
         else
             Za = Zs[k]
             α, β = points[k], points[k+1]
             # Scale the grid
-            g = scalegrid(AlgebraicCurveOrthogonalPolynomials.grid(Za, Block(N)), α, β)
+            g = scalegrid(AnnuliOrthogonalPolynomials.grid(Za, Block(N)), α, β)
             # Use fast transforms for synthesis
             FT = ZernikeAnnulusITransform{T}(N, Za.a, Za.b, 0, Za.ρ)
             val = FT * pad(ModalTrav(Ũs[:,:,k]),axes(Za,2))[Block.(OneTo(N))]
@@ -343,4 +343,35 @@ end
 function inf_error(Z::FiniteZernikeBasis{T}, θs::AbstractVector, rs::AbstractVector, vals::AbstractVector, u::Function) where T
     K = lastindex(Z.points)-1
     _inf_error(K, θs, rs, vals, u)
+end
+
+## Coefficient storage conversion
+function modaltravcellwise(Z::FiniteZernikeBasis{T}, u::AbstractArray) where T
+    N, points = Z.N, Z.points
+    K = length(points) - 1
+    U = [zeros(T, N ÷ K, 2N-1) for i in 1:K]
+    Ns, _, _ = _getMs_ms_js(N)
+    for k in 1:K
+        for i in 1:lastindex(Ns)
+            U[k][1:Ns[i], i] = u[i][k:K:end]
+        end
+    end
+    return ModalTrav.(U)
+end
+
+function listtravcellwise(Z::FiniteZernikeBasis{T}, u::AbstractArray{Vector{T}}) where T
+    N, points = Z.N, Z.points
+    K = length(points) - 1
+    Ns, _, _ = _getMs_ms_js(N)
+
+    cs = []
+    u = ModalTrav.(u)
+    for i in 1:2N-1
+        v = zeros(T, Ns[i], K)
+        for k in 1:K
+            v[:, k] = u[k].matrix[1:Ns[i],i]
+        end
+        append!(cs, [pad(vec(v'), blockedrange(Fill(K, Ns[i])))])
+    end
+    return cs
 end

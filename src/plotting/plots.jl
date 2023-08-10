@@ -42,13 +42,12 @@ end
 
 ### This helper functions takes in the coordinates and vals and saves the relevant logs
 ### to be used with the MATLAB script for plotting solutions on cylinders
-function cylinder_plot_save(xy::Matrix{<:RadialCoordinate}, z::AbstractArray, U::AbstractMatrix, path="src/plotting/")
+function cylinder_plot_save(xy::Matrix{<:RadialCoordinate}, z::AbstractArray, vals::AbstractMatrix, path="src/plotting/")
     writedlm(path*"z.log", z)
     r = [xy[i,1].r for i in 1:size(xy,1)]
     writedlm(path*"r.log", r)
     θ = [xy[1,j].θ for j in 1:size(xy,2)]
     writedlm(path*"theta.log", θ)
     
-    vals = reshape(U, length(r), length(θ), length(z)) 
-    writedlm(path*"vals.log", vals)
+    writedlm(path*"vals.log", reshape(vals, length(r), length(θ), length(z))) 
 end

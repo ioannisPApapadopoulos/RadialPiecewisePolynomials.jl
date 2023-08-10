@@ -5,6 +5,7 @@
 r  = load("r.log");
 th = load("theta.log");
 z  = load("z.log");
+th = [th(1:end-1); 2*pi];
 
 n1 = length(r);
 n2 = length(th);

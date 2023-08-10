@@ -133,7 +133,7 @@ function ldiv(C::ContinuousZernikeAnnulusElementMode{T}, f::AbstractQuasiVector)
         f̃ = f.f.(x)
     end
 
-    c = _zernikeannulus_ldiv(Z, f̃, f̃.f.(AlgebraicCurveOrthogonalPolynomials.grid(Z,20)), C.b) # ZernikeAnnulus transform
+    c = _zernikeannulus_ldiv(Z, f̃, f̃.f.(AnnuliOrthogonalPolynomials.grid(Z,20)), C.b) # ZernikeAnnulus transform
     c̃ = ModalTrav(paddeddata(c))
     c̃ = c̃.matrix[:, 2*C.m + C.j]
     # Truncate machine error tail
@@ -143,7 +143,7 @@ function ldiv(C::ContinuousZernikeAnnulusElementMode{T}, f::AbstractQuasiVector)
     
     t = inv(one(T)-ρ^2)
     L₁₁, L₀₁, L₁₀ = C.L₁₁, C.L₀₁, C.L₁₀
-    R̃ = [L₁₀[:,1] L₀₁[:,1] L₁₁]
+    R̃ = Hcat(view(L₁₀,1:N,1), view(L₀₁,1:N,1), view(L₁₁,1:N, 1:N-2))
 
     # convert from ZernikeAnnulus(ρ,0,0) to hats + Bubble
     dat = R̃[1:N,1:N] \ c̃
@@ -207,18 +207,19 @@ end
     m₀ = m == 0 ? m₀ : m₀ / T(2)
     
     
-    M = L₁₁' *  L₁₁
+    M = ApplyArray(*, L₁₁', L₁₁)
 
-    a = ((L₁₁)'[1:2,:] * L₁₀[:,1])
-    b = ((L₁₁)'[1:2,:] * L₀₁[:,1])
+    a = ApplyArray(*, view(L₁₁',1:2,1:2), view(L₁₀,1:2,1))
+    b = ApplyArray(*, view(L₁₁',1:2,1:2), view(L₀₁,1:2,1))
 
-    a11 = ((L₁₀)'[1,:]' * L₁₀[:,1])
-    a12 = ((L₁₀)'[1,:]' * L₀₁[:,1])
-    a22 = ((L₀₁)'[1,:]' * L₀₁[:,1])
+    a11 = ApplyArray(*, view(L₁₀',1,1:2)', view(L₁₀,1:2,1))
+    a12 = ApplyArray(*, view(L₁₀',1,1:2)', view(L₀₁,1:2,1))
+    a22 = ApplyArray(*, view(L₀₁',1,1:2)', view(L₀₁,1:2,1))
     
-    C = [a11 a12 a'; a12 a22 b']
+    # C = Vcat(Hcat(a11[1], a12[1], [a;Zeros{T}(∞)]'), Hcat(a12[1], a22[1], [b;Zeros{T}(∞)]'))
+    C = Vcat(Hcat(a11[1], a12[1], a'), Hcat(a12[1], a22[1], b'))[1:2,1:4]
     M = Hcat(Vcat(C[1:2,3:4]', Zeros{T}(∞,2)), M)
-    β^2*m₀*Vcat(Hcat(C, Zeros{T}(2,∞)), M)
+    Vcat(Hcat(β^2*m₀*C, Zeros{T}(2,∞)), β^2*m₀*M)
 end
 
 ###
@@ -294,7 +295,7 @@ end
     end
 
     Δ = [[C[1:2,3]'; Zeros{T}(∞,2)] Δ]
-    Vcat([C Zeros{T}(2,∞)], Δ)
+    Vcat(Hcat(C, Zeros{T}(2,∞)), Δ)
 end
 
 ###
@@ -303,7 +304,7 @@ end
 
 function grid(C::ContinuousZernikeAnnulusElementMode{T}, j::Int) where T
     Z = ZernikeAnnulus{T}(C.points[1]/C.points[2], zero(T), zero(T))
-    AlgebraicCurveOrthogonalPolynomials.grid(Z, Block(j+C.m))
+    AnnuliOrthogonalPolynomials.grid(Z, Block(j+C.m))
 end
 
 function scalegrid(g::Matrix{RadialCoordinate{T}}, α::T, β::T) where T
@@ -340,7 +341,7 @@ function plotvalues(u::ApplyQuasiVector{T,typeof(*),<:Tuple{ContinuousZernikeAnn
     f[:, 2C.m + C.j]= [c̃; zeros(size(f,1)-length(c̃))] 
     F = ModalTrav(f)
 
-    # AlgebraicCurveOrthogonalPolynomials.plotvalues(Z*[F; zeros(∞)], x)
+    # AnnuliOrthogonalPolynomials.plotvalues(Z*[F; zeros(∞)], x)
     N = size(f,1)
 
     # Scale the grid

@@ -1,5 +1,5 @@
 using Test, RadialPiecewisePolynomials, LinearAlgebra
-using ClassicalOrthogonalPolynomials, AlgebraicCurveOrthogonalPolynomials
+using ClassicalOrthogonalPolynomials, AnnuliOrthogonalPolynomials
 import MultivariateOrthogonalPolynomials: Zernike, ModalTrav
 
 @testset "diskelement" begin

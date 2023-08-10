@@ -228,7 +228,7 @@ function finite_plotvalues(F::FiniteContinuousZernike, us::AbstractVector)
         if k == 1 && first(points) ≈ 0
             ρ = points[2]
             Z = Zernike{T}(0)
-            g = scalegrid(AlgebraicCurveOrthogonalPolynomials.grid(Z, Block(2N)), ρ)
+            g = scalegrid(AnnuliOrthogonalPolynomials.grid(Z, Block(2N)), ρ)
             FT = ZernikeITransform{T}(2N, 0, 0)
             val = FT * pad(ModalTrav(Ũs[:,:,k]),axes(Z,2))[Block.(OneTo(2N))]
         else
@@ -236,7 +236,7 @@ function finite_plotvalues(F::FiniteContinuousZernike, us::AbstractVector)
             ρ = α / β
             Z = ZernikeAnnulus{T}(ρ, zero(T), zero(T))
             # Scale the grid
-            g = scalegrid(AlgebraicCurveOrthogonalPolynomials.grid(Z, Block(N)), α, β)
+            g = scalegrid(AnnuliOrthogonalPolynomials.grid(Z, Block(N)), α, β)
             # Use fast transforms for synthesis
             FT = ZernikeAnnulusITransform{T}(N, 0, 0, 0, ρ)
             val = FT * pad(ModalTrav(Ũs[:,:,k]),axes(Z,2))[Block.(OneTo(N))]
