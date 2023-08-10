@@ -261,3 +261,60 @@ function inf_error(F::FiniteContinuousZernike{T}, θs::AbstractVector, rs::Abstr
     K = lastindex(F.points)-1
     _inf_error(K, θs, rs, vals, u)
 end
+
+function modaltrav_2_list(F::FiniteContinuousZernike{T}, u::AbstractArray{Vector{T}}) where T
+    N, points = F.N, F.points
+    K = length(points) - 1
+    Ns, _, _ = _getMs_ms_js(N)
+
+    cs = []
+    u = ModalTrav.(u)
+    for i in 1:2N-1
+        v = zeros(T, Ns[i]-1, K)
+        for k in 1:K
+            v[:, k] = u[k].matrix[1:Ns[i]-1,i]
+        end
+        append!(cs, [pad(vec(v'), blockedrange(Fill(K, Ns[i]-1)))])
+    end
+    return cs
+end
+
+function adi_2_modaltrav(F::FiniteContinuousZernike{T}, wQ::Weighted{<:Any, <:Jacobi}, Us::AbstractArray, z::AbstractArray{T}) where T
+    N, points = F.N, F.points
+    K = length(points) - 1
+    Ns, _, _ = _getMs_ms_js(N)
+
+    Y =  [zeros(T, sum(1:N), length(z)) for k in 1:K]
+    for zi in 1:lastindex(z)
+        X = [zeros(T, Ns[1], 2N-1) for k in 1:K]
+        for k in 1:K
+            for n in 1:2N-1
+                us = Us[n][k:K:end, zi]
+                X[k][1:lastindex(us), n] = us
+            end
+            Y[k][:,zi] = ModalTrav(X[k])
+        end
+    end
+    return Y
+end
+
+function adi_2_list(F::FiniteContinuousZernike{T}, wQ::Weighted{<:Any, <:Jacobi}, Us::AbstractArray, z::AbstractArray{T}) where T
+    N, points = F.N, F.points
+    K = length(points) - 1
+    Ns, _, _ = _getMs_ms_js(N)
+
+    Y = []
+
+    for zi in 1:lastindex(z)
+        cs = []
+        for n in 1:2N-1
+            v = zeros(T, Ns[n]-1, K)
+            for k in 1:K
+                v[:, k] = Us[n][k:K:end, zi]
+            end
+            append!(cs, [pad(vec(v'), blockedrange(Fill(K, Ns[n]-1)))])
+        end
+        append!(Y, [cs])
+    end
+    return Y
+end

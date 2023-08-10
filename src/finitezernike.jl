@@ -346,7 +346,7 @@ function inf_error(Z::FiniteZernikeBasis{T}, θs::AbstractVector, rs::AbstractVe
 end
 
 ## Coefficient storage conversion
-function modaltravcellwise(Z::FiniteZernikeBasis{T}, u::AbstractArray) where T
+function list_2_modaltrav(Z::FiniteZernikeBasis{T}, u::AbstractArray) where T
     N, points = Z.N, Z.points
     K = length(points) - 1
     U = [zeros(T, N ÷ K, 2N-1) for i in 1:K]
@@ -359,7 +359,7 @@ function modaltravcellwise(Z::FiniteZernikeBasis{T}, u::AbstractArray) where T
     return ModalTrav.(U)
 end
 
-function listtravcellwise(Z::FiniteZernikeBasis{T}, u::AbstractArray{Vector{T}}) where T
+function modaltrav_2_list(Z::FiniteZernikeBasis{T}, u::AbstractArray{Vector{T}}) where T
     N, points = Z.N, Z.points
     K = length(points) - 1
     Ns, _, _ = _getMs_ms_js(N)
@@ -374,4 +374,23 @@ function listtravcellwise(Z::FiniteZernikeBasis{T}, u::AbstractArray{Vector{T}})
         append!(cs, [pad(vec(v'), blockedrange(Fill(K, Ns[i])))])
     end
     return cs
+end
+
+function adi_2_modaltrav(Z::FiniteZernikeBasis{T}, P::Legendre{T}, Us::AbstractArray, z::AbstractArray{T}) where T
+    N, points = Z.N, Z.points
+    K = length(points) - 1
+    Ns, _, _ = _getMs_ms_js(N)
+
+    Y =  [zeros(T, sum(1:N), length(z)) for k in 1:K]
+    for i in 1:lastindex(z)
+        X = [zeros(T, Ns[1], 2N-1) for k in 1:K]
+        for k in 1:K
+            for n in 1:2N-1
+                us = Us[n][k:K:end, i]
+                X[k][1:lastindex(us), n] = us
+            end
+            Y[k][:,i] = ModalTrav(X[k])
+        end
+    end
+    return Y
 end

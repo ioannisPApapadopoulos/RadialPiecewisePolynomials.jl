@@ -317,11 +317,13 @@ end
 
 function bubble2ann(C::ContinuousZernikeAnnulusElementMode, c::AbstractVector{T}) where T
     L₁₁, L₀₁, L₁₀ = C.L₁₁, C.L₀₁, C.L₁₀
-    R̃ = [L₁₀[:,1] L₀₁[:,1] L₁₁]
     if c isa LazyArray
         c = paddeddata(c)
     end
-    R̃[1:length(c), 1:length(c)] * c # coefficients for ZernikeAnnulus(ρ,0,0)
+    N = length(c)
+    R̃ = Hcat(view(L₁₀,1:N,1), view(L₀₁,1:N,1), view(L₁₁,1:N, 1:N-2))
+
+    R̃ * c # coefficients for ZernikeAnnulus(ρ,0,0)
 end
 
 function plotvalues(u::ApplyQuasiVector{T,typeof(*),<:Tuple{ContinuousZernikeAnnulusElementMode, AbstractVector}}) where T
