@@ -349,7 +349,7 @@ end
 function list_2_modaltrav(Z::FiniteZernikeBasis{T}, u::AbstractArray) where T
     N, points = Z.N, Z.points
     K = length(points) - 1
-    U = [zeros(T, N ÷ K, 2N-1) for i in 1:K]
+    U = [zeros(T, N ÷ 2, 2N-1) for i in 1:K]
     Ns, _, _ = _getMs_ms_js(N)
     for k in 1:K
         for i in 1:lastindex(Ns)
