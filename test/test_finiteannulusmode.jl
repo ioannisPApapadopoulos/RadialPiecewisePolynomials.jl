@@ -15,6 +15,7 @@ f1s(xy) = exp(-first(xy)^2-last(xy)^2) * sqrt(first(xy)^2+last(xy)^2)*sin(atan(l
         @test F.m == 0
         @test F.j == 1
         @test F.N == N
+        @test F.via_Jacobi == false
     end
 
     @testset "continuity" begin

@@ -69,7 +69,7 @@ function ldiv(C::ContinuousZernikeElementMode{T}, f::AbstractQuasiVector) where 
 
     # Seems to cache on its own, no need to memoize unlike annulus
     c = Z0 \ f̃ # Zernike transform
-    c̃ = paddeddata(c)
+    c̃ = ModalTrav(paddeddata(c))
     N = size(c̃.matrix, 1) # degree
     
     # Restrict to relevant mode and add a column corresponding to the hat function.

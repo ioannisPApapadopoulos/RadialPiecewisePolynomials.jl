@@ -17,6 +17,7 @@ end
         @test F isa FiniteContinuousZernike
         @test F.points == [0.5; 0.7; 1.0]
         @test F.N == N
+        @test F.via_Jacobi == true
     end
 
     # @testset "continuity" begin
@@ -32,48 +33,50 @@ end
     # end
 
     @testset "expansion & mass & differentiation matrices" begin
-        Memoization.empty_all_caches!()
-        ρ = 0.2
-        N = 50; points = [0.2; 0.5; 0.8; 1.0]
-        K = length(points)-1
+        for via_Jacobi in [false, true]
+            Memoization.empty_all_caches!()
+            ρ = 0.2
+            N = 50; points = [0.2; 0.5; 0.8; 1.0]
+            K = length(points)-1
 
-        # Just annuli elements
-        F = FiniteContinuousZernike(N, points)
-        fc = F \ f0.(axes(F,1))
-        (θs, rs, vals) = finite_plotvalues(F, fc)
-        vals_, err = inf_error(F, θs, rs, vals, f0)
-        @test err < 1e-15
-        M = F' * F
-        @test length(M) == 2N-1
-        @test size(M[1]) == (K*N/2-(K-1), K*N/2-(K-1))
-        @test size(M[end]) == (7, 7)
-        ∇ = Derivative(axes(F,1)); Δ = (∇*F)' * (∇*F)
-        @test length(Δ) == 2N-1
-        @test size(Δ[1]) == (K*N/2-(K-1), K*N/2-(K-1))
-        @test size(Δ[end]) == (7, 7)
-        @test sum(transpose.(fc) .* (M .* fc)) ≈  0.0055779595855720305
-        @test sum(transpose.(fc) .* (Δ .* fc)) ≈  0.16873822986436868
+            # Just annuli elements
+            F = FiniteContinuousZernike(N, points, via_Jacobi)
+            fc = F \ f0.(axes(F,1))
+            (θs, rs, vals) = finite_plotvalues(F, fc)
+            vals_, err = inf_error(F, θs, rs, vals, f0)
+            @test err < 1e-14
+            M = F' * F
+            @test length(M) == 2N-1
+            @test size(M[1]) == (K*N/2-(K-1), K*N/2-(K-1))
+            @test size(M[end]) == (7, 7)
+            ∇ = Derivative(axes(F,1)); Δ = (∇*F)' * (∇*F)
+            @test length(Δ) == 2N-1
+            @test size(Δ[1]) == (K*N/2-(K-1), K*N/2-(K-1))
+            @test size(Δ[end]) == (7, 7)
+            @test sum(transpose.(fc) .* (M .* fc)) ≈  0.0055779595855720305
+            @test sum(transpose.(fc) .* (Δ .* fc)) ≈  0.16873822986436868
 
 
-        # disk + annuli elements
-        N = 50; points = [0.0; 0.5; 0.8; 1.0]
-        K = length(points)-1
+            # disk + annuli elements
+            N = 50; points = [0.0; 0.5; 0.8; 1.0]
+            K = length(points)-1
 
-        F = FiniteContinuousZernike(N, points)
-        fc = F \ f0.(axes(F,1))
-        (θs, rs, vals) = finite_plotvalues(F, fc)
-        vals_, err = inf_error(F, θs, rs, vals, f0)
-        @test err < 1e-15
-        M = F' * F
-        @test length(M) == 2N-1
-        @test size(M[1]) == (K*(N/2-1), K*(N/2-1))
-        @test size(M[end]) == (6, 6)
-        ∇ = Derivative(axes(F,1)); Δ = (∇*F)' * (∇*F)
-        @test length(Δ) == 2N-1
-        @test size(Δ[1]) == (K*(N/2-1), K*(N/2-1))
-        @test size(Δ[end]) == (6, 6)
-        @test sum(transpose.(fc) .* (M .* fc)) ≈  0.005578088780274445
-        @test sum(transpose.(fc) .* (Δ .* fc)) ≈ 0.16877589535690113
+            F = FiniteContinuousZernike(N, points, via_Jacobi)
+            fc = F \ f0.(axes(F,1))
+            (θs, rs, vals) = finite_plotvalues(F, fc)
+            vals_, err = inf_error(F, θs, rs, vals, f0)
+            @test err < 1e-14
+            M = F' * F
+            @test length(M) == 2N-1
+            @test size(M[1]) == (K*(N/2-1), K*(N/2-1))
+            @test size(M[end]) == (6, 6)
+            ∇ = Derivative(axes(F,1)); Δ = (∇*F)' * (∇*F)
+            @test length(Δ) == 2N-1
+            @test size(Δ[1]) == (K*(N/2-1), K*(N/2-1))
+            @test size(Δ[end]) == (6, 6)
+            @test sum(transpose.(fc) .* (M .* fc)) ≈  0.005578088780274445
+            @test sum(transpose.(fc) .* (Δ .* fc)) ≈ 0.16877589535690113
+        end
     end
 
 end
