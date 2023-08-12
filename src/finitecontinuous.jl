@@ -1,4 +1,4 @@
-const VIA_JACOBI = true # toggle this to go via _ann2element_via_Jacobi or _ann2element_via_lowering
+const VIA_JACOBI = false # toggle this to go via _ann2element_via_Jacobi or _ann2element_via_lowering
 
 struct FiniteContinuousZernike{T, N<:Int, P<:AbstractVector} <: Basis{T}
     N::N
@@ -91,12 +91,16 @@ function _getFs(N::Int, points::AbstractVector{T}, via_Jacobi::Bool) where T
 
     # Loop over the Fourier modes
     Fs = []
+
+    # Pre-calling gives a big speedup.
+    Lss = [[Ls[i][j][1:N+1] for j in 1:3] for i in 1:K+1-κ]
+
     for (M, m, j) in zip(Ms, ms, js)
         # Extract the lowering and differentiation matrices associated
         # with each Fourier mode and store in the Tuples
-        L₁₁ = NTuple{K+1-κ, AbstractMatrix}([Ls[i][1][m+1] for i in 1:K+1-κ])
-        L₀₁ = NTuple{K+1-κ, AbstractMatrix}([Ls[i][2][m+1] for i in 1:K+1-κ])
-        L₁₀ = NTuple{K+1-κ, AbstractMatrix}([Ls[i][3][m+1] for i in 1:K+1-κ])
+        L₁₁ = NTuple{K+1-κ, AbstractMatrix}([Lss[i][1][m+1] for i in 1:K+1-κ])
+        L₀₁ = NTuple{K+1-κ, AbstractMatrix}([Lss[i][2][m+1] for i in 1:K+1-κ])
+        L₁₀ = NTuple{K+1-κ, AbstractMatrix}([Lss[i][3][m+1] for i in 1:K+1-κ])
         
         D = NTuple{K+1-κ, AbstractMatrix}([(Ds[i]).ops[m+1] for i in 1:K+1-κ])
 
