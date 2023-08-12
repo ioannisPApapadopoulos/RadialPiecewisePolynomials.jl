@@ -169,7 +169,7 @@ end
     T = promote_type(eltype(FT), eltype(Z))
     F = FT.parent
 
-    @assert F.points == Z.points && F.m == Z.m && F.j == Z.j && F.via_Jacobi == false
+    @assert F.points == Z.points && F.m == Z.m && F.j == Z.j
 
     points, a, b, m = Z.points, Z.a, Z.b, Z.m
     α, β = first(points), last(points)

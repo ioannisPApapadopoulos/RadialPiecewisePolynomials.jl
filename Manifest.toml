@@ -20,9 +20,7 @@ version = "1.5.0"
 
 [[deps.AnnuliOrthogonalPolynomials]]
 deps = ["BlockArrays", "BlockBandedMatrices", "ClassicalOrthogonalPolynomials", "ContinuumArrays", "DomainSets", "FastTransforms", "FillArrays", "HarmonicOrthogonalPolynomials", "LazyArrays", "LinearAlgebra", "MultivariateOrthogonalPolynomials", "QuasiArrays", "SemiclassicalOrthogonalPolynomials", "StaticArrays"]
-git-tree-sha1 = "bed642acc470e3e06f83673a145894f752495205"
-repo-rev = "main"
-repo-url = "https://github.com/JuliaApproximation/AnnuliOrthogonalPolynomials.jl.git"
+path = "C:\\Users\\john.papad\\.julia\\dev\\AnnuliOrthogonalPolynomials"
 uuid = "de1797fd-24c3-4035-91a2-b52aecdcfb01"
 version = "0.0.1"
 
