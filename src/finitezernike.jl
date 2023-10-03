@@ -264,7 +264,7 @@ end
     T = promote_type(eltype(FT), eltype(Z))
     F = FT.parent
 
-    @assert F.N == Z.N && F.points == Z.points && F.m == Z.m && F.j == Z.j
+    @assert F.N == Z.N && F.points == Z.points && F.m == Z.m && F.j == Z.j && F.via_Jacobi == false
 
     N, points, m = Z.N, T.(Z.points), Z.m
     K = length(points)-1
@@ -280,10 +280,10 @@ end
 @simplify function *(FT::QuasiAdjoint{<:Any,<:FiniteContinuousZernike}, Z::FiniteZernikeBasis)
         T = promote_type(eltype(FT), eltype(Z))
         F = FT.parent
-        @assert F.N == Z.N && F.points == Z.points
+        @assert F.N == Z.N && F.points == Z.points && F.via_Jacobi == false
 
         N, points = Z.N, T.(Z.points);
-        Fs = _getFs(N, points)
+        Fs = _getFs(N, points, F.via_Jacobi)
         Zs = _getFZs(N, points, Z.a, Z.b)
 
         [F̃' * Z̃ for (F̃, Z̃) in zip(Fs, Zs)]

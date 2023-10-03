@@ -1,15 +1,18 @@
+const VIA_JACOBI = false # toggle this to go via _ann2element_via_Jacobi or _ann2element_via_lowering
+
 struct FiniteContinuousZernike{T, N<:Int, P<:AbstractVector} <: Basis{T}
     N::N
     points::P
     Fs::Tuple{Vararg{FiniteContinuousZernikeMode}}
+    via_Jacobi::Bool
 end
 
-function FiniteContinuousZernike{T}(N::Int, points::AbstractVector, Fs::Tuple{Vararg{FiniteContinuousZernikeMode}}) where {T}
+function FiniteContinuousZernike{T}(N::Int, points::AbstractVector, Fs::Tuple{Vararg{FiniteContinuousZernikeMode}}, via_Jacobi::Bool) where {T}
     @assert length(points) > 1 && points == sort(points)
     @assert length(Fs) == 2N-1
-    FiniteContinuousZernike{T, Int, typeof(points)}(N, points, Fs)
+    FiniteContinuousZernike{T, Int, typeof(points)}(N, points, Fs, via_Jacobi)
 end
-FiniteContinuousZernike(N::Int, points::AbstractVector) = FiniteContinuousZernike{Float64}(N, points, Tuple(_getFs(N, points)))
+FiniteContinuousZernike(N::Int, points::AbstractVector, via_Jacobi::Bool=VIA_JACOBI) = FiniteContinuousZernike{Float64}(N, points, Tuple(_getFs(N, points, via_Jacobi)), via_Jacobi)
 
 function axes(Z::FiniteContinuousZernike{T}) where T
     first(Z.points) ≈ 0 && return (Inclusion(last(Z.points)*UnitDisk{T}()), blockedrange(Vcat(length(Z.points)-1, Fill(length(Z.points) - 1, Z.N-2))))
@@ -56,7 +59,7 @@ function _getMs_ms_js(N::Int)
     (Ms, ms, js)
 end
 
-function _getFs(N::Int, points::AbstractVector{T}) where T
+function _getFs(N::Int, points::AbstractVector{T}, via_Jacobi::Bool) where T
     # Ordered list of Fourier modes (ms, js) and correct length for each Fourier mode Ms.
     Ms, ms, js = _getMs_ms_js(N)
     K = length(points)-1
@@ -74,7 +77,12 @@ function _getFs(N::Int, points::AbstractVector{T}) where T
 
     # Use broadcast notation to compute all the lowering matrices across all
     # intervals and Fourier modes simultaneously.
-    Ls = _ann2element_via_lowering.(ts)
+
+    if via_Jacobi
+        Ls = _ann2element_via_Jacobi.(ts)
+    else
+        Ls = _ann2element_via_lowering.(ts)
+    end
 
     # Use broadcast notation to compute all the derivative matrices across
     # all the intervals and Fourier modes simultaneously
@@ -83,28 +91,31 @@ function _getFs(N::Int, points::AbstractVector{T}) where T
 
     # Loop over the Fourier modes
     Fs = []
+
+    # Pre-calling gives a big speedup.
+    Lss = [[Ls[i][j][1:N+1] for j in 1:3] for i in 1:K+1-κ]
+
     for (M, m, j) in zip(Ms, ms, js)
         # Extract the lowering and differentiation matrices associated
         # with each Fourier mode and store in the Tuples
-        L₁₁ = NTuple{K+1-κ, AbstractMatrix}([Ls[i][1][m+1] for i in 1:K+1-κ])
-        L₀₁ = NTuple{K+1-κ, AbstractMatrix}([Ls[i][2][m+1] for i in 1:K+1-κ])
-        L₁₀ = NTuple{K+1-κ, AbstractMatrix}([Ls[i][3][m+1] for i in 1:K+1-κ])
+        L₁₁ = NTuple{K+1-κ, AbstractMatrix}([Lss[i][1][m+1] for i in 1:K+1-κ])
+        L₀₁ = NTuple{K+1-κ, AbstractMatrix}([Lss[i][2][m+1] for i in 1:K+1-κ])
+        L₁₀ = NTuple{K+1-κ, AbstractMatrix}([Lss[i][3][m+1] for i in 1:K+1-κ])
         
         D = NTuple{K+1-κ, AbstractMatrix}([(Ds[i]).ops[m+1] for i in 1:K+1-κ])
 
         # Construct the structs for each Fourier mode seperately
-        append!(Fs, [FiniteContinuousZernikeMode(M, points, m, j, L₁₁, L₀₁, L₁₀, D, N)])
+        append!(Fs, [FiniteContinuousZernikeMode(M, points, m, j, L₁₁, L₀₁, L₁₀, D, via_Jacobi, N)])
     end
     return Fs
 end
 
-_getFs(F::FiniteContinuousZernike{T}) where T = _getFs(F.N, F.points)
+_getFs(F::FiniteContinuousZernike{T}) where T = _getFs(F.N, F.points, F.via_Jacobi)
 
 function ldiv(F::FiniteContinuousZernike{V}, f::AbstractQuasiVector) where V
     # T = promote_type(V, eltype(f))
     @warn "Expanding via FiniteContinuousZernike is ill-conditioned, please use FiniteZernikeBasis."
     T = V
-    N = F.N; points = T.(F.points)
 
     Fs = F.Fs
     [F \ f.f.(axes(F, 1)) for F in Fs]
@@ -208,7 +219,6 @@ function _bubble2disk_or_ann_all_modes(F::FiniteContinuousZernike, us::AbstractV
                 Ũs[1:Ms[i],i,k] = bubble2disk(m, Us[1:Ms[i],i,k])
             end
         else
-            α, β = points[k], points[k+1]
             for (Fm, i) in zip(Fs, 1:2N-1)
                 C = _getCs(Fm)[k]
                 Ũs[1:Ms[i],i,k] = bubble2ann(C, Us[1:Ms[i],i,k])
@@ -234,11 +244,12 @@ function finite_plotvalues(F::FiniteContinuousZernike, us::AbstractVector)
         else
             α, β = points[k], points[k+1]
             ρ = α / β
-            Z = ZernikeAnnulus{T}(ρ, zero(T), zero(T))
+            w_a = F.via_Jacobi ? one(T) : zero(T)
+            Z = ZernikeAnnulus{T}(ρ, w_a, w_a)
             # Scale the grid
             g = scalegrid(AnnuliOrthogonalPolynomials.grid(Z, Block(N)), α, β)
             # Use fast transforms for synthesis
-            FT = ZernikeAnnulusITransform{T}(N, 0, 0, 0, ρ)
+            FT = ZernikeAnnulusITransform{T}(N, w_a, w_a, 0, ρ)
             val = FT * pad(ModalTrav(Ũs[:,:,k]),axes(Z,2))[Block.(OneTo(N))]
         end
         (θ, r, val) = plot_helper(g, val)

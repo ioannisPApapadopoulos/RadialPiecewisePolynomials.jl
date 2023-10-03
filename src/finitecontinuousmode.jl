@@ -7,19 +7,20 @@ struct FiniteContinuousZernikeMode{T} <: Basis{T}
     L₀₁::Tuple{Vararg{AbstractMatrix{T}}}
     L₁₀::Tuple{Vararg{AbstractMatrix{T}}}
     D::Tuple{Vararg{AbstractMatrix{T}}}
+    via_Jacobi::Bool
     b::Int # Should remove once adaptive expansion has been figured out.
 end
 
-function FiniteContinuousZernikeMode(N::Int, points::AbstractVector{T}, m::Int, j::Int, L₁₁, L₀₁, L₁₀, D) where T
+function FiniteContinuousZernikeMode(N::Int, points::AbstractVector{T}, m::Int, j::Int, L₁₁, L₀₁, L₁₀, D, via_Jacobi) where T
     @assert length(points) > 2 && points == sort(points)
     @assert m ≥ 0
     @assert m == 0 ? j == 1 : 0 ≤ j ≤ 1
     K = first(points) ≈ 0 ? length(points)-2 : length(points) - 1
     @assert length(L₁₁) == length(L₀₁) == length(L₁₀) == length(D) == K
-    FiniteContinuousZernikeMode{T}(N, points, m, j, L₁₁, L₀₁, L₁₀, D, m+2N)
+    FiniteContinuousZernikeMode{T}(N, points, m, j, L₁₁, L₀₁, L₁₀, D, via_Jacobi, m+2N)
 end
 
-function FiniteContinuousZernikeMode(N::Int, points::AbstractVector{T}, m::Int, j::Int) where {T}
+function FiniteContinuousZernikeMode(N::Int, points::AbstractVector{T}, m::Int, j::Int, via_Jacobi::Bool=false) where {T}
     K = length(points)-1
     κ = first(points[1]) ≈ 0 ? 2 : 1
     ρs = []
@@ -29,7 +30,11 @@ function FiniteContinuousZernikeMode(N::Int, points::AbstractVector{T}, m::Int, 
     end
 
     ts = inv.(one(T) .- ρs.^2)
-    Ls = _ann2element_via_lowering.(ts, m)
+    if via_Jacobi
+        Ls = _ann2element_via_Jacobi.(ts, m)
+    else
+        Ls = _ann2element_via_lowering.(ts, m)
+    end
     L₁₁ = NTuple{K+1-κ, AbstractMatrix}(first.(Ls))
     L₀₁ = NTuple{K+1-κ, AbstractMatrix}([Ls[k][2] for k in 1:K+1-κ])
     L₁₀ = NTuple{K+1-κ, AbstractMatrix}(last.(Ls))
@@ -38,7 +43,7 @@ function FiniteContinuousZernikeMode(N::Int, points::AbstractVector{T}, m::Int, 
     D = (Z .\ (Laplacian.(axes.(Z,1)).*Weighted.(Z)))
     D = NTuple{K+1-κ, AbstractMatrix}([Ds.ops[m+1] for Ds in D])
 
-    FiniteContinuousZernikeMode(N, points, m, j, L₁₁, L₀₁, L₁₀, D)
+    FiniteContinuousZernikeMode(N, points, m, j, L₁₁, L₀₁, L₁₀, D, via_Jacobi)
 end
 
 # FiniteContinuousZernikeMode(points::AbstractVector, m::Int, j::Int, L₁₁, L₀₁, L₁₀, D, b::Int) = FiniteContinuousZernikeMode{Float64}(points, m, j, L₁₁, L₀₁, L₁₀, D, b)
@@ -51,17 +56,17 @@ function axes(Z::FiniteContinuousZernikeMode{T}) where T
 end
 ==(P::FiniteContinuousZernikeMode, Q::FiniteContinuousZernikeMode) = P.points == Q.points && P.m == Q.m && P.j == Q.j && P.b == Q.b
 
-function _getCs(points::AbstractVector{T}, m::Int, j::Int, b::Int, L₁₁, L₀₁, L₁₀, D) where T
+function _getCs(points::AbstractVector{T}, m::Int, j::Int, b::Int, L₁₁, L₀₁, L₁₀, D, via_Jacobi::Bool) where T
     K = length(points)-1
-    first(points) > 0 && return [ContinuousZernikeAnnulusElementMode([points[k]; points[k+1]], m, j, L₁₁[k], L₀₁[k], L₁₀[k], D[k], b) for k in 1:K]
+    first(points) > 0 && return [ContinuousZernikeAnnulusElementMode([points[k]; points[k+1]], m, j, L₁₁[k], L₀₁[k], L₁₀[k], D[k], via_Jacobi, b) for k in 1:K]
 
-    append!(Any[ContinuousZernikeElementMode([points[1]; points[2]], m, j)], [ContinuousZernikeAnnulusElementMode([points[k]; points[k+1]], m, j, L₁₁[k-1], L₀₁[k-1], L₁₀[k-1], D[k-1], b) for k in 2:K])
+    append!(Any[ContinuousZernikeElementMode([points[1]; points[2]], m, j)], [ContinuousZernikeAnnulusElementMode([points[k]; points[k+1]], m, j, L₁₁[k-1], L₀₁[k-1], L₁₀[k-1], D[k-1], via_Jacobi, b) for k in 2:K])
 end
 
 function _getCs(F::FiniteContinuousZernikeMode)
-    points, m, j, b, = F.points, F.m, F.j, F.b
+    points, m, j, b, via_Jacobi = F.points, F.m, F.j, F.b, F.via_Jacobi
     L₁₁, L₀₁, L₁₀, D = F.L₁₁, F.L₀₁, F.L₁₀, F.D
-    _getCs(points, m, j, b, L₁₁, L₀₁, L₁₀, D)
+    _getCs(points, m, j, b, L₁₁, L₀₁, L₁₀, D, via_Jacobi)
 end
 
 function _getγs(points::AbstractArray{T}, m::Int) where T
@@ -222,7 +227,7 @@ end
     Ms = [C' * C for C in Cs]
     γs = _getγs(B)
 
-    M = _arrow_head_matrix(B, Ms, γs, B.N, 2, first(B.points))
+    # M = _arrow_head_matrix(B, Ms, γs, B.N, 2, first(B.points))
     if B.N < 4
         return _arrow_head_matrix(B, Ms, γs, B.N, 1, first(B.points))
         # return M[Block.(1:B.N-1), Block.(1:B.N-1)]
