@@ -284,6 +284,14 @@ function zero_dirichlet_bcs!(F::FiniteContinuousZernikeMode{T}, Δ::LinearAlgebr
     end
 end
 
+function zero_dirichlet_bcs!(F::FiniteContinuousZernikeMode{T}, A::Matrix{T}) where T
+    points = F.points
+    K = length(points)-1
+    A[1,:] .= zero(T); A[:,1] .= zero(T)
+    A[K+1, :] .= zero(T); A[:, K+1] .= zero(T)
+    A[1,1] = one(T); A[K+1, K+1] = one(T)
+end
+
 function zero_dirichlet_bcs!(F::FiniteContinuousZernikeMode{T}, Mf::PseudoBlockVector{T}) where T
     points = F.points
     K = length(points)-1
