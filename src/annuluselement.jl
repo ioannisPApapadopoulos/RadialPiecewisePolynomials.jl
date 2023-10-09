@@ -27,7 +27,7 @@ function _ann2element_via_Jacobi(t::T, m::Int) where T
 end
 
 # Matrices for lowering to ZernikeAnnulus(0,0) via
-# direct lowering. Less stable, but probably lower complexity.
+# direct lowering. Slower for now, but actually lower complexity.
 function _ann2element_via_lowering(t::T, m::Int) where T
     Q₀₀ = SemiclassicalJacobi(t, 0, 0, m)
     Q₀₁ = SemiclassicalJacobi(t, 0, 1, m)
@@ -49,16 +49,18 @@ struct ContinuousZernikeAnnulusElementMode{T} <: Basis{T}
     L₀₁::AbstractMatrix{T}
     L₁₀::AbstractMatrix{T}
     D::AbstractMatrix{T}
+    normalize_constants::AbstractVector{T}
     via_Jacobi::Bool       # I use this as a flag to quickly switch between _ann2element_via_Jacobi or _ann2element_via_lowering
     b::Int # Should remove once adaptive expansion has been figured out.
 end
 
-function ContinuousZernikeAnnulusElementMode(points::AbstractVector{T}, m::Int, j::Int, L₁₁::AbstractMatrix, L₀₁::AbstractMatrix, L₁₀::AbstractMatrix, D::AbstractMatrix, via_Jacobi::Bool, b::Int) where T
+function ContinuousZernikeAnnulusElementMode(points::AbstractVector{T}, m::Int, j::Int, L₁₁::AbstractMatrix, L₀₁::AbstractMatrix, L₁₀::AbstractMatrix, D::AbstractMatrix, normalize_constants::AbstractVector{T}, via_Jacobi::Bool, b::Int) where T
     @assert length(points) == 2 && zero(T) < points[1] < points[2] ≤ one(T)
     @assert m ≥ 0
     @assert m == 0 ? j == 1 : 0 ≤ j ≤ 1
+    @assert length(normalize_constants) ≥ 2
     # @assert b ≥ m
-    ContinuousZernikeAnnulusElementMode{T}(points, m, j, L₁₁, L₀₁, L₁₀, D, via_Jacobi, b)
+    ContinuousZernikeAnnulusElementMode{T}(points, m, j, L₁₁, L₀₁, L₁₀, D, normalize_constants, via_Jacobi, b)
 end
 
 function ContinuousZernikeAnnulusElementMode(points::AbstractVector{T}, m::Int, j::Int, via_Jacobi::Bool=false) where T
@@ -67,13 +69,15 @@ function ContinuousZernikeAnnulusElementMode(points::AbstractVector{T}, m::Int, 
     t = inv(one(T)-ρ^2)
     if via_Jacobi
         (L₁₁, L₀₁, L₁₀) = _ann2element_via_Jacobi(t, m)
+        normalize_constants = [_sum_semiclassicaljacobiweight(t, 1, 1, m), _sum_semiclassicaljacobiweight(t, 2, 0, m), _sum_semiclassicaljacobiweight(t, 0, 2, m)]
     else
         (L₁₁, L₀₁, L₁₀) = _ann2element_via_lowering(t, m)
+        normalize_constants = [_sum_semiclassicaljacobiweight(t, a, a, m) for a in 1:-1:0]
     end
     Z = ZernikeAnnulus{T}(ρ,1,1)
     D = (Z \ (Laplacian(axes(Z,1))*Weighted(Z))).ops[m+1]
 
-    ContinuousZernikeAnnulusElementMode(points, m, j, L₁₁, L₀₁, L₁₀, D, via_Jacobi, 200)
+    ContinuousZernikeAnnulusElementMode(points, m, j, L₁₁, L₀₁, L₁₀, D, normalize_constants, via_Jacobi, 200)
 end
 
 # ContinuousZernikeAnnulusElementMode(points::AbstractVector, m::Int, j::Int, L₁₁::AbstractMatrix, L₀₁::AbstractMatrix, L₁₀::AbstractMatrix, D::AbstractMatrix, b::Int) = ContinuousZernikeAnnulusElementMode{Float64}(points, m, j, L₁₁, L₀₁, L₁₀, D, b)
@@ -164,8 +168,11 @@ end
 ###
 
 function _sum_semiclassicaljacobiweight(t::T, a::Number, b::Number, c::Number) where T
-    (t,a,b,c) = map(big, map(float, (t,a,b,c)))
-    return convert(T, t^c * beta(1+a,1+b) * _₂F₁general2(1+a,-c,2+a+b,1/t))
+    # (t,a,b,c) = map(big, map(float, (t,a,b,c)))
+    # return convert(T, t^c * beta(1+a,1+b) * _₂F₁general2(1+a,-c,2+a+b,1/t))
+    # Working much better thanks to Timon Gutleb's efforts,
+    # see https://github.com/JuliaApproximation/SemiclassicalOrthogonalPolynomials.jl/pull/90
+    convert(T, first(sum.(SemiclassicalJacobiWeight.(t,a,b,c:c))))
 end
 
 @simplify function *(A::QuasiAdjoint{<:Any,<:ContinuousZernikeAnnulusElementMode}, B::ContinuousZernikeAnnulusElementMode)
@@ -184,21 +191,21 @@ end
         m₀ = convert(T,π) / ( t^(one(T) + m) )
         m₀ = m == 0 ? m₀ : m₀ / T(2)
 
-        jw = _sum_semiclassicaljacobiweight(t,1,1,m) / t^2
+        jw = B.normalize_constants[1]/t^2 #_sum_semiclassicaljacobiweight(t,1,1,m) / t^2
         M = ApplyArray(*,Diagonal(Fill(jw,∞)),L₁₁)
         a = jw.*view(L₁₀,1:2,1)
         b = jw.*view(L₀₁,1:2,1)
 
-        a11 = _sum_semiclassicaljacobiweight(t,2,0,m) / t^2
+        a11 = B.normalize_constants[2]/ t^2 # _sum_semiclassicaljacobiweight(t,2,0,m)
         a12 = jw
-        a22 = _sum_semiclassicaljacobiweight(t,0,2,m) / t^2
+        a22 = B.normalize_constants[3]/ t^2 # _sum_semiclassicaljacobiweight(t,0,2,m) / t^2
 
         C = [a11 a12 a'; a12 a22 b']
         M = Hcat(Vcat(C[1:2,3:4]', Zeros{T}(∞,2)), M)
         return β^2*m₀*Vcat(Hcat(C, Zeros{T}(2,∞)), M)
     else
         # Contribution from the mass matrix of harmonic polynomial
-        jw = _sum_semiclassicaljacobiweight(t,0,0,m)
+        jw = B.normalize_constants[2] # _sum_semiclassicaljacobiweight(t,0,0,m)
         m₀ = convert(T,π) / ( t^(one(T) + m) ) * jw
         m₀ = m == 0 ? m₀ : m₀ / T(2)
 
@@ -278,7 +285,7 @@ end
     
     # Contribution from the normalisation <w R_m,j^(ρ,1,1,0),R_m,j^(ρ,1,1,0)>_L^2
     t = inv(one(T)-ρ^2)
-    jw = _sum_semiclassicaljacobiweight(t,1,1,m)
+    jw = B.C.normalize_constants[1] # _sum_semiclassicaljacobiweight(t,1,1,m)
     m₀ = convert(T,π) / ( t^(3 + m) ) * jw
     m₀ = m == 0 ? m₀ : m₀ / T(2)
 

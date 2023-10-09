@@ -40,6 +40,7 @@ end
 # Matrices for lowering to ZernikeAnnulus(0,0) via
 # direct lowering. Less stable, but probably lower complexity.
 function _ann2element_via_lowering(t::T) where T
+    # {T} did not change the speed.
     Q₀₀ = SemiclassicalJacobi{T}.(t, 0, 0, 0:∞)
     Q₀₁ = SemiclassicalJacobi{T}.(t, 0, 1, 0:∞)
     Q₁₀ = SemiclassicalJacobi{T}.(t, 1, 0, 0:∞)
@@ -80,20 +81,28 @@ function _getFs(N::Int, points::AbstractVector{T}, via_Jacobi::Bool) where T
 
     if via_Jacobi
         Ls = _ann2element_via_Jacobi.(ts)
+        cst = [[sum.(SemiclassicalJacobiWeight.(t,1,1,0:ms[end])) for t in ts],
+                [sum.(SemiclassicalJacobiWeight.(t,2,0,0:ms[end])) for t in ts],
+                [sum.(SemiclassicalJacobiWeight.(t,0,2,0:ms[end])) for t in ts]]
     else
         Ls = _ann2element_via_lowering.(ts)
+        cst = [[sum.(SemiclassicalJacobiWeight.(t,a,a,0:ms[end])) for t in ts] for a in 1:-1:0]
     end
 
     # Use broadcast notation to compute all the derivative matrices across
     # all the intervals and Fourier modes simultaneously
     Z = ZernikeAnnulus{T}.(ρs,1,1)
     Ds = (Z .\ (Laplacian.(axes.(Z,1)).*Weighted.(Z)))
+    Ds = [Ds[i].ops for i in 1:K+1-κ];
 
     # Loop over the Fourier modes
     Fs = []
 
-    # Pre-calling gives a big speedup. # i is the element, j is the type of lowering
-    [[Ls[i][j][N+1] for j in 1:3] for i in 1:K+1-κ]
+    # Pre-calling (sometimes) gives a big speedup.
+    # After some tests, this is not the case here.
+    # i is the element, j is the type of lowering
+    # [[Ls[i][j][N+1] for j in 1:3] for i in 1:K+1-κ]
+    # [Ds[i][N+1] for i in 1:K+1-κ]
 
     for (M, m, j) in zip(Ms, ms, js)
         # Extract the lowering and differentiation matrices associated
@@ -102,10 +111,12 @@ function _getFs(N::Int, points::AbstractVector{T}, via_Jacobi::Bool) where T
         L₀₁ = NTuple{K+1-κ, AbstractMatrix}([Ls[i][2][m+1] for i in 1:K+1-κ])
         L₁₀ = NTuple{K+1-κ, AbstractMatrix}([Ls[i][3][m+1] for i in 1:K+1-κ])
         
-        D = NTuple{K+1-κ, AbstractMatrix}([(Ds[i]).ops[m+1] for i in 1:K+1-κ])
+        D = NTuple{K+1-κ, AbstractMatrix}([Ds[i][m+1] for i in 1:K+1-κ])
+
+        normalize_constants = [[cst[k][i][m+1] for k in 1:lastindex(cst)] for i in 1:K+1-κ]
 
         # Construct the structs for each Fourier mode seperately
-        append!(Fs, [FiniteContinuousZernikeMode(M, points, m, j, L₁₁, L₀₁, L₁₀, D, via_Jacobi, N)])
+        append!(Fs, [FiniteContinuousZernikeMode(M, points, m, j, L₁₁, L₀₁, L₁₀, D, normalize_constants, via_Jacobi, N)])
     end
     return Fs
 end
@@ -113,10 +124,7 @@ end
 _getFs(F::FiniteContinuousZernike{T}) where T = _getFs(F.N, F.points, F.via_Jacobi)
 
 function ldiv(F::FiniteContinuousZernike{V}, f::AbstractQuasiVector) where V
-    # T = promote_type(V, eltype(f))
     @warn "Expanding via FiniteContinuousZernike is ill-conditioned, please use FiniteZernikeBasis."
-    T = V
-
     Fs = F.Fs
     [F \ f.f.(axes(F, 1)) for F in Fs]
 end
@@ -126,7 +134,6 @@ end
 # Gives out list of mass matrices of correct size
 ###
 @simplify function *(A::QuasiAdjoint{<:Any,<:FiniteContinuousZernike}, B::FiniteContinuousZernike)
-    T = promote_type(eltype(A), eltype(B))
     @assert A' == B
     Fs = B.Fs
     [F' * F for F in Fs]
@@ -229,18 +236,19 @@ function _bubble2disk_or_ann_all_modes(F::FiniteContinuousZernike, us::AbstractV
 end
 
 
-function finite_plotvalues(F::FiniteContinuousZernike, us::AbstractVector)
+function finite_plotvalues(F::FiniteContinuousZernike, us::AbstractVector; N=0)
     T = eltype(F)
     _, Ũs = _bubble2disk_or_ann_all_modes(F, us)
-    points = T.(F.points); N = F.N; K = length(points)-1
-    θs=[]; rs=[]; vals = []   
+    points, K = T.(F.points), length(F.points)-1
+    N = N == 0 ? F.N : N
+    θs, rs, vals = [], [], []
     for k in 1:K
         if k == 1 && first(points) ≈ 0
             ρ = points[2]
             Z = Zernike{T}(0)
-            g = scalegrid(AnnuliOrthogonalPolynomials.grid(Z, Block(2N)), ρ)
-            FT = ZernikeITransform{T}(2N, 0, 0)
-            val = FT * pad(ModalTrav(Ũs[:,:,k]),axes(Z,2))[Block.(OneTo(2N))]
+            g = scalegrid(AnnuliOrthogonalPolynomials.grid(Z, Block(N)), ρ)
+            FT = ZernikeITransform{T}(N, 0, 0)
+            val = FT * pad(ModalTrav(Ũs[:,:,k]),axes(Z,2))[Block.(OneTo(N))]
         else
             α, β = points[k], points[k+1]
             ρ = α / β

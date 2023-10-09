@@ -42,7 +42,7 @@ zero_dirichlet_bcs!(F, Mf) # bcs
 # Solve over each Fourier mode seperately
 u = Δ .\ Mf
 
-(θs, rs, vals) = finite_plotvalues(F, u)
+(θs, rs, vals) = finite_plotvalues(F, u, N=200)
 vals_, err = inf_error(F, θs, rs, vals, ua_xy) # Check inf-norm errors on the grid
 err
 plot(F, θs, rs, vals) # plot

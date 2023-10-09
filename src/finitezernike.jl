@@ -148,7 +148,7 @@ end
 
     @assert F.points == Z.points && F.m == Z.m && F.j == Z.j
 
-    points, a, b, m, j = Z.points, Z.a, Z.b, Z.m, Z.j
+    points, a, b, m = Z.points, Z.a, Z.b, Z.m
     α, β = first(points), last(points)
     ρ = α / β
     t = inv(one(T)-ρ^2)
@@ -156,7 +156,7 @@ end
 
     if a == 0 && b == 0
         # Contribution from the mass matrix of harmonic polynomial
-        jw = _sum_semiclassicaljacobiweight(t,0,0,m)
+        jw = F.normalize_constants[2] # _sum_semiclassicaljacobiweight(t,0,0,m)
         m₀ = convert(T,π) / ( t^(one(T) + m) ) * jw
         m₀ = m == 0 ? m₀ : m₀ / T(2)
         Vcat(Hcat(β^2*m₀*view(L₁₀,:,1), β^2*m₀*view(L₀₁,:,1))', β^2*m₀*L₁₁')
@@ -313,17 +313,18 @@ function _bubble2disk_or_ann_all_modes(Z::FiniteZernikeBasis{T}, us::AbstractVec
 end
 
 
-function finite_plotvalues(Z::FiniteZernikeBasis{T}, us::AbstractVector) where T
+function finite_plotvalues(Z::FiniteZernikeBasis{T}, us::AbstractVector; N=0) where T
     _, Ũs = _bubble2disk_or_ann_all_modes(Z, us)
-    points = T.(Z.points); N = Z.N; K = length(points)-1
+    points, K = T.(Z.points), length(Z.points)-1
+    N = N == 0 ? Z.N : N
     Zs = Z.Zs
     θs=[]; rs=[]; vals = []   
     for k in 1:K
         if k == 1 && first(points) ≈ 0
             ρ = points[2]
-            g = scalegrid(AnnuliOrthogonalPolynomials.grid(Zs[k], Block(2N)), ρ)
-            FT = ZernikeITransform{T}(2N, Zs[k].a, Zs[k].b)
-            val = FT * pad(ModalTrav(Ũs[:,:,k]),axes(Zs[k],2))[Block.(OneTo(2N))]
+            g = scalegrid(AnnuliOrthogonalPolynomials.grid(Zs[k], Block(N)), ρ)
+            FT = ZernikeITransform{T}(N, Zs[k].a, Zs[k].b)
+            val = FT * pad(ModalTrav(Ũs[:,:,k]),axes(Zs[k],2))[Block.(OneTo(N))]
         else
             Za = Zs[k]
             α, β = points[k], points[k+1]

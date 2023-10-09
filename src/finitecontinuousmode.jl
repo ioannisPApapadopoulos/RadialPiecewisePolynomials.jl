@@ -7,17 +7,19 @@ struct FiniteContinuousZernikeMode{T} <: Basis{T}
     L₀₁::Tuple{Vararg{AbstractMatrix{T}}}
     L₁₀::Tuple{Vararg{AbstractMatrix{T}}}
     D::Tuple{Vararg{AbstractMatrix{T}}}
+    normalize_constants::AbstractVector{<:AbstractVector{<:T}}
     via_Jacobi::Bool
     b::Int # Should remove once adaptive expansion has been figured out.
 end
 
-function FiniteContinuousZernikeMode(N::Int, points::AbstractVector{T}, m::Int, j::Int, L₁₁, L₀₁, L₁₀, D, via_Jacobi) where T
-    @assert length(points) > 2 && points == sort(points)
+function FiniteContinuousZernikeMode(N::Int, points::AbstractVector{T}, m::Int, j::Int, L₁₁, L₀₁, L₁₀, D, normalize_constants::AbstractVector{<:AbstractVector{<:T}}, via_Jacobi) where T
+    @assert points == sort(points)
     @assert m ≥ 0
     @assert m == 0 ? j == 1 : 0 ≤ j ≤ 1
     K = first(points) ≈ 0 ? length(points)-2 : length(points) - 1
     @assert length(L₁₁) == length(L₀₁) == length(L₁₀) == length(D) == K
-    FiniteContinuousZernikeMode{T}(N, points, m, j, L₁₁, L₀₁, L₁₀, D, via_Jacobi, m+2N)
+    @assert length(normalize_constants) ≥ 2
+    FiniteContinuousZernikeMode{T}(N, points, m, j, L₁₁, L₀₁, L₁₀, D, normalize_constants, via_Jacobi, m+2N)
 end
 
 function FiniteContinuousZernikeMode(N::Int, points::AbstractVector{T}, m::Int, j::Int, via_Jacobi::Bool=false) where {T}
@@ -32,8 +34,10 @@ function FiniteContinuousZernikeMode(N::Int, points::AbstractVector{T}, m::Int, 
     ts = inv.(one(T) .- ρs.^2)
     if via_Jacobi
         Ls = _ann2element_via_Jacobi.(ts, m)
+        normalize_constants = [[_sum_semiclassicaljacobiweight(t, 1, 1, m), _sum_semiclassicaljacobiweight(t, 2, 0, m), _sum_semiclassicaljacobiweight(t, 0, 2, m)] for t in ts]
     else
         Ls = _ann2element_via_lowering.(ts, m)
+        normalize_constants = [[_sum_semiclassicaljacobiweight(t, a, a, m) for a in 1:-1:0] for t in ts]
     end
     L₁₁ = NTuple{K+1-κ, AbstractMatrix}(first.(Ls))
     L₀₁ = NTuple{K+1-κ, AbstractMatrix}([Ls[k][2] for k in 1:K+1-κ])
@@ -43,7 +47,7 @@ function FiniteContinuousZernikeMode(N::Int, points::AbstractVector{T}, m::Int, 
     D = (Z .\ (Laplacian.(axes.(Z,1)).*Weighted.(Z)))
     D = NTuple{K+1-κ, AbstractMatrix}([Ds.ops[m+1] for Ds in D])
 
-    FiniteContinuousZernikeMode(N, points, m, j, L₁₁, L₀₁, L₁₀, D, via_Jacobi)
+    FiniteContinuousZernikeMode(N, points, m, j, L₁₁, L₀₁, L₁₀, D, normalize_constants, via_Jacobi)
 end
 
 # FiniteContinuousZernikeMode(points::AbstractVector, m::Int, j::Int, L₁₁, L₀₁, L₁₀, D, b::Int) = FiniteContinuousZernikeMode{Float64}(points, m, j, L₁₁, L₀₁, L₁₀, D, b)
@@ -56,17 +60,17 @@ function axes(Z::FiniteContinuousZernikeMode{T}) where T
 end
 ==(P::FiniteContinuousZernikeMode, Q::FiniteContinuousZernikeMode) = P.points == Q.points && P.m == Q.m && P.j == Q.j && P.b == Q.b
 
-function _getCs(points::AbstractVector{T}, m::Int, j::Int, b::Int, L₁₁, L₀₁, L₁₀, D, via_Jacobi::Bool) where T
+function _getCs(points::AbstractVector{T}, m::Int, j::Int, b::Int, L₁₁, L₀₁, L₁₀, D, normalize_constants, via_Jacobi::Bool) where T
     K = length(points)-1
-    first(points) > 0 && return [ContinuousZernikeAnnulusElementMode([points[k]; points[k+1]], m, j, L₁₁[k], L₀₁[k], L₁₀[k], D[k], via_Jacobi, b) for k in 1:K]
+    first(points) > 0 && return [ContinuousZernikeAnnulusElementMode([points[k]; points[k+1]], m, j, L₁₁[k], L₀₁[k], L₁₀[k], D[k], normalize_constants[k], via_Jacobi, b) for k in 1:K]
 
-    append!(Any[ContinuousZernikeElementMode([points[1]; points[2]], m, j)], [ContinuousZernikeAnnulusElementMode([points[k]; points[k+1]], m, j, L₁₁[k-1], L₀₁[k-1], L₁₀[k-1], D[k-1], via_Jacobi, b) for k in 2:K])
+    append!(Any[ContinuousZernikeElementMode([points[1]; points[2]], m, j)], [ContinuousZernikeAnnulusElementMode([points[k]; points[k+1]], m, j, L₁₁[k-1], L₀₁[k-1], L₁₀[k-1], D[k-1], normalize_constants[k-1], via_Jacobi, b) for k in 2:K])
 end
 
 function _getCs(F::FiniteContinuousZernikeMode)
     points, m, j, b, via_Jacobi = F.points, F.m, F.j, F.b, F.via_Jacobi
-    L₁₁, L₀₁, L₁₀, D = F.L₁₁, F.L₀₁, F.L₁₀, F.D
-    _getCs(points, m, j, b, L₁₁, L₀₁, L₁₀, D, via_Jacobi)
+    L₁₁, L₀₁, L₁₀, D, normalize_constants = F.L₁₁, F.L₀₁, F.L₁₀, F.D, F.normalize_constants
+    _getCs(points, m, j, b, L₁₁, L₀₁, L₁₀, D, normalize_constants, via_Jacobi)
 end
 
 function _getγs(points::AbstractArray{T}, m::Int) where T
@@ -287,9 +291,14 @@ end
 function zero_dirichlet_bcs!(F::FiniteContinuousZernikeMode{T}, A::Matrix{T}) where T
     points = F.points
     K = length(points)-1
-    A[1,:] .= zero(T); A[:,1] .= zero(T)
-    A[K+1, :] .= zero(T); A[:, K+1] .= zero(T)
-    A[1,1] = one(T); A[K+1, K+1] = one(T)
+    if first(points) > 0
+        A[1,:] .= zero(T); A[:,1] .= zero(T)
+        A[K+1, :] .= zero(T); A[:, K+1] .= zero(T)
+        A[1,1] = one(T); A[K+1, K+1] = one(T)
+    else
+        A[K,:] .= zero(T); A[:,K] .= zero(T)
+        A[K,K] = one(T)
+    end
 end
 
 function zero_dirichlet_bcs!(F::FiniteContinuousZernikeMode{T}, Mf::PseudoBlockVector{T}) where T

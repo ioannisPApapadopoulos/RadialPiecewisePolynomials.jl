@@ -26,7 +26,11 @@ export SVector, Zeros, Ones, Vcat, Derivative, pad, paddeddata, Hcat, RadialCoor
         FiniteContinuousZernikeMode, FiniteContinuousZernike, inf_error,
         FiniteZernikeBasis, ZernikeBasisMode, FiniteZernikeBasisMode,
         ArrowheadMatrix,
-        list_2_modaltrav, modaltrav_2_list, adi_2_modaltrav, adi_2_list
+        list_2_modaltrav, modaltrav_2_list, adi_2_modaltrav, adi_2_list,
+        get_rs, get_θs
+
+get_rs(x) = x.r
+get_θs(x) = x.θ
 
 include("arrowhead.jl")
 include("diskelement.jl")
