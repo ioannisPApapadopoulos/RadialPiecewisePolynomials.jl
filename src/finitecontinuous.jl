@@ -78,11 +78,11 @@ function _getFs(N::Int, points::AbstractVector{T}, via_Jacobi::Bool) where T
     # If all ρs are the same, then we can reduce the computational
     # overhead by only considering one hierarchy of semiclassical
     # Jacobi polynomials for all the cells.
-    # if all(ρs .≈ ρs[1])
-    #     ρs = [ρs[1]]
-    #     κ = K
-    #     same_ρs = true
-    # end
+    if all(ρs .≈ ρs[1])
+        ρs = [ρs[1]]
+        κ = K
+        same_ρs = true
+    end
 
     # Semiclassical Jacobi parameter t
     ts = inv.(one(T) .- ρs.^2)
