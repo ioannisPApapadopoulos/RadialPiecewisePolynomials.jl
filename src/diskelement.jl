@@ -128,7 +128,7 @@ end
     m = B.C.m
 
     Δ = -D.ops[m+1]
-    cₘ = π*m*zerniker(m,m,0,0,one(T))^2 # = <Z^(0,1)_{m,m,j}, Z^(0,1)_{m,m,j}>_L^2
+    cₘ = π*m*zerniker(m,m,0,0,one(T))^2 # = <∇ Z^(0,1)_{m,m,j},∇ Z^(0,1)_{m,m,j}>_L^2
 
     Vcat([T[cₘ]; Zeros{T}(∞)]', [Zeros{T}(∞) Δ])
 end

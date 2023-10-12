@@ -62,6 +62,7 @@ end
 
 function _getFs(N::Int, points::AbstractVector{T}, via_Jacobi::Bool) where T
     # Ordered list of Fourier modes (ms, js) and correct length for each Fourier mode Ms.
+    same_ρs = false
     Ms, ms, js = _getMs_ms_js(N)
     K = length(points)-1
 
@@ -73,6 +74,16 @@ function _getFs(N::Int, points::AbstractVector{T}, via_Jacobi::Bool) where T
         α, β = convert(T, points[k]), convert(T, points[k+1])
         append!(ρs, [α / β])
     end
+
+    # If all ρs are the same, then we can reduce the computational
+    # overhead by only considering one hierarchy of semiclassical
+    # Jacobi polynomials for all the cells.
+    # if all(ρs .≈ ρs[1])
+    #     ρs = [ρs[1]]
+    #     κ = K
+    #     same_ρs = true
+    # end
+
     # Semiclassical Jacobi parameter t
     ts = inv.(one(T) .- ρs.^2)
 
@@ -116,7 +127,7 @@ function _getFs(N::Int, points::AbstractVector{T}, via_Jacobi::Bool) where T
         normalize_constants = [[cst[k][i][m+1] for k in 1:lastindex(cst)] for i in 1:K+1-κ]
 
         # Construct the structs for each Fourier mode seperately
-        append!(Fs, [FiniteContinuousZernikeMode(M, points, m, j, L₁₁, L₀₁, L₁₀, D, normalize_constants, via_Jacobi, N)])
+        append!(Fs, [FiniteContinuousZernikeMode(M, points, m, j, L₁₁, L₀₁, L₁₀, D, normalize_constants, via_Jacobi, same_ρs, N)])
     end
     return Fs
 end
