@@ -2,7 +2,7 @@
 
 julia_version = "1.9.2"
 manifest_format = "2.0"
-project_hash = "569964edfdda30b82bfbf7e6492ddba13ac995fe"
+project_hash = "b0a1614238239a1868646de0ffb2dae02b05d74b"
 
 [[deps.AbstractFFTs]]
 deps = ["LinearAlgebra"]
@@ -20,7 +20,7 @@ version = "1.5.0"
 
 [[deps.AnnuliOrthogonalPolynomials]]
 deps = ["BlockArrays", "BlockBandedMatrices", "ClassicalOrthogonalPolynomials", "ContinuumArrays", "DomainSets", "FastTransforms", "FillArrays", "HarmonicOrthogonalPolynomials", "LazyArrays", "LinearAlgebra", "MultivariateOrthogonalPolynomials", "QuasiArrays", "SemiclassicalOrthogonalPolynomials", "StaticArrays"]
-path = "C:\\Users\\john.papad\\.julia\\dev\\AnnuliOrthogonalPolynomials"
+git-tree-sha1 = "62070edaf6cf7991fa77cb315c895901210ae531"
 uuid = "de1797fd-24c3-4035-91a2-b52aecdcfb01"
 version = "0.0.2"
 
@@ -504,9 +504,7 @@ version = "0.7.0"
 
 [[deps.SemiclassicalOrthogonalPolynomials]]
 deps = ["ArrayLayouts", "BandedMatrices", "ClassicalOrthogonalPolynomials", "ContinuumArrays", "FillArrays", "HypergeometricFunctions", "InfiniteArrays", "InfiniteLinearAlgebra", "LazyArrays", "LinearAlgebra", "QuasiArrays", "SpecialFunctions"]
-git-tree-sha1 = "a9daeb1d93bf262ea8196ebb132e2bbaacc13a78"
-repo-rev = "master"
-repo-url = "https://github.com/TSGut/SemiclassicalOrthogonalPolynomials.jl.git"
+git-tree-sha1 = "7733fc692b791aa9297b40d41761a86d1376857b"
 uuid = "291c01f3-23f6-4eb6-aeb0-063a639b53f2"
 version = "0.5.3"
 
