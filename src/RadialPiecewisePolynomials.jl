@@ -10,7 +10,7 @@ import ContinuumArrays: Weight, grid, ℵ₁, ℵ₀, @simplify, ProjectionFacto
 import Base: in, axes, getindex, broadcasted, tail, +, -, *, /, \, convert, OneTo, show, summary, ==, oneto, diff
 import SemiclassicalOrthogonalPolynomials: HalfWeighted
 import MultivariateOrthogonalPolynomials: BlockOneTo, ModalInterlace, BlockRange1, Plan, ModalTrav, ZernikeITransform
-import ClassicalOrthogonalPolynomials: checkpoints, ShuffledR2HC, TransformFactorization, ldiv, paddeddata, jacobimatrix, orthogonalityweight, SetindexInterlace, pad, blockedrange
+import ClassicalOrthogonalPolynomials: checkpoints, ShuffledR2HC, TransformFactorization, ldiv, paddeddata, jacobimatrix, orthogonalityweight, SetindexInterlace, pad, blockedrange, Clenshaw, recurrencecoefficients, _p0, colsupport
 import LinearAlgebra: eigvals, eigen, isapprox, SymTridiagonal, norm, factorize
 import AnnuliOrthogonalPolynomials: factorize, ZernikeAnnulusITransform
 import LazyArrays: Vcat

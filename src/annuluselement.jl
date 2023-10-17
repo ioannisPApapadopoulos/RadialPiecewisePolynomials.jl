@@ -86,6 +86,11 @@ end
 axes(Z::ContinuousZernikeAnnulusElementMode) = (Inclusion(annulus(first(Z.points), last(Z.points))), oneto(∞))
 ==(P::ContinuousZernikeAnnulusElementMode, Q::ContinuousZernikeAnnulusElementMode) = P.points == Q.points && P.m == Q.m && P.j == Q.j
 
+function show(io::IO, C::ContinuousZernikeAnnulusElementMode)
+    points = C.points
+    print(io, "ContinuousZernikeAnnulusElementMode: $points.")
+end
+
 function getindex(Z::ContinuousZernikeAnnulusElementMode{T}, xy::StaticVector{2}, j::Int)::T where {T}
     p = Z.points
     α, β = convert(T, p[1]), convert(T, p[2])
@@ -168,11 +173,11 @@ end
 ###
 
 function _sum_semiclassicaljacobiweight(t::T, a::Number, b::Number, c::Number) where T
-    # (t,a,b,c) = map(big, map(float, (t,a,b,c)))
-    # return convert(T, t^c * beta(1+a,1+b) * _₂F₁general2(1+a,-c,2+a+b,1/t))
+    (t,a,b,c) = map(big, map(float, (t,a,b,c)))
+    return convert(T, t^c * beta(1+a,1+b) * _₂F₁general2(1+a,-c,2+a+b,1/t))
     # Working much better thanks to Timon Gutleb's efforts,
     # see https://github.com/JuliaApproximation/SemiclassicalOrthogonalPolynomials.jl/pull/90
-    convert(T, first(sum.(SemiclassicalJacobiWeight.(t,a,b,c:c))))
+    # convert(T, first(sum.(SemiclassicalJacobiWeight.(t,a,b,c:c))))
 end
 
 @simplify function *(A::QuasiAdjoint{<:Any,<:ContinuousZernikeAnnulusElementMode}, B::ContinuousZernikeAnnulusElementMode)
@@ -209,21 +214,59 @@ end
         m₀ = convert(T,π) / ( t^(one(T) + m) ) * jw
         m₀ = m == 0 ? m₀ : m₀ / T(2)
 
-        M = ApplyArray(*, L₁₁', L₁₁)
+        L = Hcat(Vcat(view(L₁₀,1:2,1:1)[1:2], Zeros{T}(∞)), Vcat(view(L₀₁,1:2,1:1)[1:2], Zeros{T}(∞)), L₁₁)
+        # TODO fix the excess zeros
+        return ApplyArray(*,Diagonal(Fill(β^2*m₀,∞)), ApplyArray(*, L', L))
 
-        a = ApplyArray(*, view(L₁₁',1:2,1:2), view(L₁₀,1:2,1))
-        b = ApplyArray(*, view(L₁₁',1:2,1:2), view(L₀₁,1:2,1))
+        # Old code - for deprecation
+        # M = ApplyArray(*, L₁₁', L₁₁)
 
-        a11 = ApplyArray(*, view(L₁₀',1,1:2)', view(L₁₀,1:2,1))
-        a12 = ApplyArray(*, view(L₁₀',1,1:2)', view(L₀₁,1:2,1))
-        a22 = ApplyArray(*, view(L₀₁',1,1:2)', view(L₀₁,1:2,1))
+        # a = ApplyArray(*, view(L₁₁',1:2,1:2), view(L₁₀,1:2,1))
+        # b = ApplyArray(*, view(L₁₁',1:2,1:2), view(L₀₁,1:2,1))
 
-        # C = Vcat(Hcat(a11[1], a12[1], [a;Zeros{T}(∞)]'), Hcat(a12[1], a22[1], [b;Zeros{T}(∞)]'))
-        C = Vcat(Hcat(a11[1], a12[1], a'), Hcat(a12[1], a22[1], b'))[1:2,1:4]
-        M = Hcat(Vcat(C[1:2,3:4]', Zeros{T}(∞,2)), M)
-        return Vcat(Hcat(β^2*m₀*C, Zeros{T}(2,∞)), β^2*m₀*M)
+        # a11 = ApplyArray(*, view(L₁₀',1,1:2)', view(L₁₀,1:2,1))
+        # a12 = ApplyArray(*, view(L₁₀',1,1:2)', view(L₀₁,1:2,1))
+        # a22 = ApplyArray(*, view(L₀₁',1,1:2)', view(L₀₁,1:2,1))
+
+        # # C = Vcat(Hcat(a11[1], a12[1], [a;Zeros{T}(∞)]'), Hcat(a12[1], a22[1], [b;Zeros{T}(∞)]'))
+        # C = Vcat(Hcat(a11[1], a12[1], a'), Hcat(a12[1], a22[1], b'))[1:2,1:4]
+        # M = Hcat(Vcat(C[1:2,3:4]', Zeros{T}(∞,2)), M)
+        # return Vcat(Hcat(β^2*m₀*C, Zeros{T}(2,∞)), β^2*m₀*M)
     end
 end
+
+@simplify function *(A::QuasiAdjoint{<:Any,<:ContinuousZernikeAnnulusElementMode}, B::BroadcastQuasiMatrix{<:Any, typeof(*), <:Tuple{BroadcastQuasiVector, <:ContinuousZernikeAnnulusElementMode}})
+    λ, C = B.args
+    T = promote_type(eltype(A), eltype(C))
+
+    @assert C.via_Jacobi == false
+    @assert A' == C
+
+    α, β = convert(T, first(C.points)), convert(T, last(C.points))
+    ρ = α / β
+    m = C.m
+
+    t = inv(one(T)-ρ^2)
+    L₁₁, L₀₁, L₁₀ = C.L₁₁, C.L₀₁, C.L₁₀
+
+    jw = C.normalize_constants[2] # _sum_semiclassicaljacobiweight(t,0,0,m)
+    m₀ = convert(T,π) / ( t^(one(T) + m) ) * jw
+    m₀ = m == 0 ? m₀ : m₀ / T(2)
+    L = Hcat(Vcat(view(L₁₀,1:2,1:1)[1:2], Zeros{T}(∞)), Vcat(view(L₀₁,1:2,1:1)[1:2], Zeros{T}(∞)), L₁₁)
+
+    # We need to compute the Jacobi matrix multiplier addition due to the
+    # variable Helmholtz coefficient λ(r²). We expand λ(r²) in chebyshevt
+    # and then use Clenshaw to compute λ(β^2*(I-X)/t) where X is the 
+    # correponding Jacobi matrix for this basis.
+    Tn = chebyshevt(C.points[1]..C.points[2])
+    u = Tn \ λ.f.(axes(Tn,1))
+    X = jacobimatrix(SemiclassicalJacobi(t, 0, 0, m))
+    W = Clenshaw(paddeddata(u), recurrencecoefficients(Tn)..., β^2*(I-X/t), _p0(Tn))
+
+    # TODO fix the excess zeros
+    return ApplyArray(*,Diagonal(Fill(β^2*m₀,∞)), ApplyArray(*, L', ApplyArray(*, W, L)))
+end
+
 
 ###
 # Gradient and L2 inner product of gradient
@@ -287,11 +330,11 @@ end
     t = inv(one(T)-ρ^2)
     jw = B.C.normalize_constants[1] # _sum_semiclassicaljacobiweight(t,1,1,m)
     m₀ = convert(T,π) / ( t^(3 + m) ) * jw
-    m₀ = m == 0 ? m₀ : m₀ / T(2)
+    m₀ = m == 0 ? m₀ : m₀ / 2
 
     Δ = - m₀ * B.C.D
     if m == 0
-        c = convert(T,2π)*(T(1) - ρ^4)
+        c = convert(T,2π)*(one(T) - ρ^4)
         C = [c -c 4*m₀*(m+1); -c c -4*m₀*(m+1)]
     else
         C = [W010(m, ρ) W_100_010(m, ρ) 4*m₀*(m+1); W_100_010(m, ρ) W100(m,ρ) -4*m₀*(m+1)]

@@ -117,4 +117,26 @@ f1s(xy) = exp(-first(xy)^2-last(xy)^2) * sqrt(first(xy)^2+last(xy)^2)*sin(atan(l
         @test fc' * (Δ * fc) ≈ 2.686674356967118
     end
 
+    @testset "weighted mass matrix" begin
+        Memoization.empty_all_caches!()
+
+        ρ = 0.2
+        N = 100; points = [0.2; 0.5; 0.8]
+        K = length(points)-1
+
+        # Just annuli elements
+        F = FiniteContinuousZernikeMode(N, points, 0, 1)
+        fc = F \ f0.(axes(F,1))
+        λ(r²) = r²
+        M = F' * (λ.(axes(F,1)) .*F)
+        @test size(M) == (K*N-(K-1), K*N-(K-1))
+        # Integrate[Integrate[Exp[-r^2]^2*r^2*r,{r,0.2,0.8}],{y,0,2 Pi}]
+        @test fc' * (M * fc) ≈ 0.2851314275977797 # mathematica
+
+        λ(r²) = sin(r²)
+        M = F' * (λ.(axes(F,1)) .*F)
+        @test size(M) == (K*N-(K-1), K*N-(K-1))
+        # Integrate[Integrate[Exp[-r^2]^2*Sin[r^2]*r, {r, 0.2, 0.8}], {y, 0, 2 Pi}]
+        @test fc' * (M * fc) ≈ 0.277157468937116 # mathematica
+    end
 end
