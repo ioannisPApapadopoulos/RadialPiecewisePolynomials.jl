@@ -1,7 +1,7 @@
 using Test, RadialPiecewisePolynomials, LinearAlgebra
 using ClassicalOrthogonalPolynomials, SemiclassicalOrthogonalPolynomials, AnnuliOrthogonalPolynomials
 using Memoization
-import RadialPiecewisePolynomials: ModalTrav
+import RadialPiecewisePolynomials: ModalTrav, Fill, ApplyArray
 
 @testset "annuluselement" begin
     f0(xy) = exp(-first(xy)^2-last(xy)^2)
@@ -85,7 +85,7 @@ import RadialPiecewisePolynomials: ModalTrav
             M = C' * C
             # ∫_0^2π ∫_ρ^1 exp(-r^2)^2 r^2 sin(θ)^2 r dr dθ.
             N = 100
-            @test fc[1:N]' * M[1:N,1:N] * fc[1:N] ≈ 0.2320693725039186
+            @test fc[1:N]' * reshape(view(M, 1:N, 1:N)[:], N, N) * fc[1:N] ≈ 0.2320693725039186
 
             # Test m = 6
             Memoization.empty_all_caches!()
@@ -94,7 +94,7 @@ import RadialPiecewisePolynomials: ModalTrav
             M = C' * C
             # ∫_0^2π ∫_ρ^1 exp(-r^2)^2 r^12 cos(6θ)^2 r dr dθ.
             N = 100
-            @test fc[1:N]' * M[1:N,1:N] * fc[1:N] ≈ 0.04005947846778158
+            @test fc[1:N]' * reshape(view(M, 1:N, 1:N)[:], N, N) * fc[1:N] ≈ 0.04005947846778158
         end
     end
 
@@ -187,14 +187,14 @@ import RadialPiecewisePolynomials: ModalTrav
             M = C' * C
             N=20
             # <exp(-r^2), exp(-r^2)>_{L^2} = ∫_0^2π ∫_α^β  exp(-r^2)^2 r dr dθ
-            @test f[1:N]' * M[1:N,1:N] * f[1:N] ≈ 0.188147476644037 # mathematica
+            @test f[1:N]' * reshape(view(M, 1:N, 1:N)[:], N, N) * f[1:N] ≈ 0.188147476644037 # mathematica
 
             # Test mass matrix (m = 1)
             C = ContinuousZernikeAnnulusElementMode([α; β], 1, 1, via_Jacobi)
             f = C \ f1c.(axes(C,1))
             M = C' * C
             # <exp(-r^2)*r*cos(θ), exp(-r^2)*r*cos(θ)>_{L^2} = ∫_0^2π ∫_α^β  (exp(-r^2)*r*cos(θ))^2 r dr dθ
-            @test f[1:N]' * M[1:N,1:N] * f[1:N] ≈ 0.028502927676856027 # mathematica
+            @test f[1:N]' * reshape(view(M, 1:N, 1:N)[:], N, N) * f[1:N] ≈ 0.028502927676856027 # mathematica
         end
     end
 

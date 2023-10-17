@@ -22,7 +22,7 @@ end
         @test F isa FiniteContinuousZernike
         @test F.points == [0.5; 0.7; 1.0]
         @test F.N == N
-        @test F.via_Jacobi == true
+        @test F.via_Jacobi == false
     end
 
     # @testset "continuity" begin
@@ -45,7 +45,7 @@ end
             K = length(points)-1
 
             # Just annuli elements
-            F = FiniteContinuousZernike(N, points, via_Jacobi)
+            F = FiniteContinuousZernike(N, points, via_Jacobi=via_Jacobi)
             fc = F \ f0.(axes(F,1))
             (θs, rs, vals) = finite_plotvalues(F, fc)
             vals_, err = inf_error(F, θs, rs, vals, f0)
@@ -67,7 +67,7 @@ end
             N = 50; points = [0.0; 0.5; 0.8; 1.0]
             K = length(points)-1
 
-            F = FiniteContinuousZernike(N, points, via_Jacobi)
+            F = FiniteContinuousZernike(N, points, via_Jacobi=via_Jacobi)
             fc = F \ f0.(axes(F,1))
             (θs, rs, vals) = finite_plotvalues(F, fc)
             vals_, err = inf_error(F, θs, rs, vals, f0)
