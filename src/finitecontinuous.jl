@@ -7,12 +7,12 @@ struct FiniteContinuousZernike{T, N<:Int, P<:AbstractVector} <: Basis{T}
     via_Jacobi::Bool
 end
 
-function FiniteContinuousZernike{T}(N::Int, points::AbstractVector, Fs::Tuple{Vararg{FiniteContinuousZernikeMode}}, via_Jacobi::Bool) where {T}
+function FiniteContinuousZernike{T}(N::Int, points::AbstractVector, Fs::Tuple{Vararg{FiniteContinuousZernikeMode}}; via_Jacobi::Bool) where {T}
     @assert length(points) > 1 && points == sort(points)
     @assert length(Fs) == 2N-1
     FiniteContinuousZernike{T, Int, typeof(points)}(N, points, Fs, via_Jacobi)
 end
-FiniteContinuousZernike(N::Int, points::AbstractVector, via_Jacobi::Bool=VIA_JACOBI) = FiniteContinuousZernike{Float64}(N, points, Tuple(_getFs(N, points, via_Jacobi)), via_Jacobi)
+FiniteContinuousZernike(N::Int, points::AbstractVector; via_Jacobi::Bool=VIA_JACOBI) = FiniteContinuousZernike{Float64}(N, points, Tuple(_getFs(N, points, via_Jacobi)), via_Jacobi=via_Jacobi)
 
 function axes(Z::FiniteContinuousZernike{T}) where T
     first(Z.points) ≈ 0 && return (Inclusion(last(Z.points)*UnitDisk{T}()), blockedrange(Vcat(length(Z.points)-1, Fill(length(Z.points) - 1, Z.N-2))))
@@ -21,6 +21,10 @@ function axes(Z::FiniteContinuousZernike{T}) where T
 end
 ==(P::FiniteContinuousZernike, Q::FiniteContinuousZernike) = P.N == Q.N && P.points == Q.points
 
+function show(io::IO, F::FiniteContinuousZernike)
+    N, points = F.N, F.points
+    print(io, "FiniteContinuousZernike at degree N=$N and endpoints $points.")
+end
 
 # Matrices for lowering to ZernikeAnnulus(1,1) via
 # the Jacobi matrix. Stable, but probably higher complexity
@@ -149,6 +153,19 @@ end
     Fs = B.Fs
     [F' * F for F in Fs]
 end
+
+###
+# Weighted L2 inner products
+# Gives out list of weighted mass matrices of correct size
+###
+@simplify function *(A::QuasiAdjoint{<:Any,<:FiniteContinuousZernike}, λB::BroadcastQuasiMatrix{<:Any, typeof(*), <:Tuple{BroadcastQuasiVector, FiniteContinuousZernike}})
+    λ, B = λB.args
+    @assert A' == B
+    Fs = B.Fs
+    xs = [axes(F,1) for F in Fs]
+    [F' * (λ.f.(x) .* F) for (F, x) in zip(Fs, xs)]
+end
+
 
 ###
 # Gradient for constructing weak Laplacian.

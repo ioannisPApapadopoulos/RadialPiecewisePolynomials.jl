@@ -5,9 +5,9 @@ using PyPlot, DelimitedFiles, LaTeXStrings
 #######
 
 function _plot(K::Int, θs::AbstractVector, rs::AbstractVector, vals::AbstractVector;ρ::T=0.0, ttl=[]) where T
-    PyPlot.rc("font", family="serif", size=14)
-    rcParams = PyPlot.PyDict(PyPlot.matplotlib["rcParams"])
-    rcParams["text.usetex"] = true
+    # PyPlot.rc("font", family="serif", size=14)
+    # rcParams = PyPlot.PyDict(PyPlot.matplotlib["rcParams"])
+    # rcParams["text.usetex"] = true
     fig = plt.figure()
     ax = fig.add_subplot(111, projection="polar")
     vmin,vmax = minimum(minimum.(vals)), maximum(maximum.(vals))

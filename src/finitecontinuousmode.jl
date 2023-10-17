@@ -13,17 +13,17 @@ struct FiniteContinuousZernikeMode{T} <: Basis{T}
     b::Int # Should remove once adaptive expansion has been figured out.
 end
 
-function FiniteContinuousZernikeMode(N::Int, points::AbstractVector{T}, m::Int, j::Int, L₁₁, L₀₁, L₁₀, D, normalize_constants::AbstractVector{<:AbstractVector{<:T}}, via_Jacobi, same_ρs) where T
+function FiniteContinuousZernikeMode(N::Int, points::AbstractVector{T}, m::Int, j::Int, L₁₁, L₀₁, L₁₀, D, normalize_constants::AbstractVector{<:AbstractVector{<:T}}; via_Jacobi, same_ρs::Bool) where T
     @assert points == sort(points)
     @assert m ≥ 0
     @assert m == 0 ? j == 1 : 0 ≤ j ≤ 1
     K = first(points) ≈ 0 ? length(points)-2 : length(points) - 1
-    @assert length(L₁₁) == length(L₀₁) == length(L₁₀) == length(D) == same_ρs ? 1 : K
+    @assert length(L₁₁) == length(L₀₁) == length(L₁₀) == length(D) == (same_ρs ? 1 : K)
     @assert length(normalize_constants) ≥ 2
     FiniteContinuousZernikeMode{T}(N, points, m, j, L₁₁, L₀₁, L₁₀, D, normalize_constants, via_Jacobi, same_ρs, m+2N)
 end
 
-function FiniteContinuousZernikeMode(N::Int, points::AbstractVector{T}, m::Int, j::Int, via_Jacobi::Bool=false, same_ρs::Bool=false) where {T}
+function FiniteContinuousZernikeMode(N::Int, points::AbstractVector{T}, m::Int, j::Int; via_Jacobi::Bool=false, same_ρs::Bool=false) where {T}
     K = length(points)-1
     κ = first(points[1]) ≈ 0 ? 2 : 1
     ρs = []
@@ -48,7 +48,7 @@ function FiniteContinuousZernikeMode(N::Int, points::AbstractVector{T}, m::Int, 
     D = (Z .\ (Laplacian.(axes.(Z,1)).*Weighted.(Z)))
     D = NTuple{K+1-κ, AbstractMatrix}([Ds.ops[m+1] for Ds in D])
 
-    FiniteContinuousZernikeMode(N, points, m, j, L₁₁, L₀₁, L₁₀, D, normalize_constants, via_Jacobi, same_ρs)
+    FiniteContinuousZernikeMode(N, points, m, j, L₁₁, L₀₁, L₁₀, D, normalize_constants, via_Jacobi=via_Jacobi, same_ρs=same_ρs)
 end
 
 # FiniteContinuousZernikeMode(points::AbstractVector, m::Int, j::Int, L₁₁, L₀₁, L₁₀, D, b::Int) = FiniteContinuousZernikeMode{Float64}(points, m, j, L₁₁, L₀₁, L₁₀, D, b)
@@ -60,6 +60,11 @@ function axes(Z::FiniteContinuousZernikeMode{T}) where T
     (Inclusion(annulus(first(Z.points), last(Z.points))), blockedrange(Vcat(length(Z.points), Fill(length(Z.points) - 1, Z.N-2))))
 end
 ==(P::FiniteContinuousZernikeMode, Q::FiniteContinuousZernikeMode) = P.points == Q.points && P.m == Q.m && P.j == Q.j && P.b == Q.b
+
+function show(io::IO, F::FiniteContinuousZernikeMode)
+    N, points, m, j = F.N, F.points, F.m, F.j
+    print(io, "FiniteContinuousZernikeMode: N=$N, points=$points, m=$m, j=$j.")
+end
 
 function _getCs(points::AbstractVector{T}, m::Int, j::Int, b::Int, L₁₁, L₀₁, L₁₀, D, normalize_constants, via_Jacobi::Bool, same_ρs::Bool) where T
     K = length(points)-1
@@ -138,7 +143,7 @@ function _build_top_left_block(F::FiniteContinuousZernikeMode{T}, Ms, γs::Abstr
     if p ≈ 0
         a = [Ms[1][1,1]]
         for i in 2:K
-            append!(a, diag(Ms[i][1:2,1:2]))
+            append!(a, [Ms[i][1,1]; Ms[i][2,2]])
         end
 
         dv = zeros(T, K)
@@ -154,7 +159,7 @@ function _build_top_left_block(F::FiniteContinuousZernikeMode{T}, Ms, γs::Abstr
     else
         a = []
         for i in 1:K
-            append!(a, diag(Ms[i][1:2,1:2]))
+            append!(a, [Ms[i][1,1]; Ms[i][2,2]])
         end
 
         dv = zeros(T, K+1)
@@ -205,17 +210,13 @@ end
 function _build_trailing_bubbles(F::FiniteContinuousZernikeMode{T}, Ms, N::Int, bs::Int, p::T) where T
     K = length(Ms)
     if p ≈ 0
-        Mn = vcat([Ms[1][2:N-1,2:N-1]], [Ms[i][3:N, 3:N] for i in 2:K])
+        # Mn = vcat([Ms[1][2:N-1,2:N-1]], [Ms[i][3:N, 3:N] for i in 2:K])
+        Mn = vcat([reshape(view(Ms[1],2:N-1,2:N-1)[:], N-2, N-2)], [reshape(view(Ms[i],3:N, 3:N)[:], N-2, N-2) for i in 2:K])
     else
-        Mn = [Ms[i][3:N, 3:N] for i in 1:K]
+        # Mn = [Ms[i][3:N, 3:N] for i in 1:K]
+        Mn = [reshape(view(Ms[i],3:N, 3:N)[:], N-2, N-2) for i in 1:K]
     end
-    if bs ==  2
-        return [Symmetric(BandedMatrix{T}(0=>view(M, band(0)), 1=>view(M, band(1)), 2=>view(M, band(2)))) for M in Mn]
-    elseif bs == 1
-        return [Symmetric(BandedMatrix{T}(0=>view(M, band(0)), 1=>view(M, band(1)))) for M in Mn]
-    else
-        error("Are you using _build_mass_trailing_bubbles correctly?")
-    end
+    return [Symmetric(BandedMatrix{T}([i=>view(M, band(i))[:] for i in 0:bs]...)) for M in Mn]
 end
 
 function _arrow_head_matrix(F::FiniteContinuousZernikeMode, Ms, γs::AbstractArray{T}, N::Int, bs::Int, p::T) where T
@@ -256,6 +257,23 @@ end
         return _arrow_head_matrix(B, Ms, γs, B.N, 2, first(B.points))
         # return M
     end
+end
+
+@simplify function *(A::QuasiAdjoint{<:Any,<:FiniteContinuousZernikeMode}, B::BroadcastQuasiMatrix{<:Any, typeof(*), <:Tuple{BroadcastQuasiVector, FiniteContinuousZernikeMode}})
+
+    λ, F = B.args
+    N, K = F.N, length(F.points)-1
+    @assert A' == F
+
+    Cs = _getCs(F)
+    xs = [axes(C,1) for C in Cs]
+    Ms = [C' * (λ.f.(x) .* C) for (C, x) in zip(Cs, xs)]
+
+    # figure out necessary bandwidth
+    # bs for number of bubbles
+    bs = min(N-2, maximum([last(colsupport(view(Ms[i], :, 1)[:]))-2 for i in 1:lastindex(Ms)]))
+    γs = _getγs(F)
+    return _arrow_head_matrix(F, Ms, γs, N, bs, first(F.points))
 end
 
 ###

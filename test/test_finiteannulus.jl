@@ -11,13 +11,18 @@ function f0(xy)
     f0_(x,y)
 end
 
+function plane_wave(xy)
+    x,y = first(xy), last(xy)
+    sin(10*x)
+end
+
 @testset "finiteannulus" begin
     @testset "basics" begin
         N=10; F = FiniteContinuousZernike(N, [0.5; 0.7; 1])
         @test F isa FiniteContinuousZernike
         @test F.points == [0.5; 0.7; 1.0]
         @test F.N == N
-        @test F.via_Jacobi == true
+        @test F.via_Jacobi == false
     end
 
     # @testset "continuity" begin
@@ -40,7 +45,7 @@ end
             K = length(points)-1
 
             # Just annuli elements
-            F = FiniteContinuousZernike(N, points, via_Jacobi)
+            F = FiniteContinuousZernike(N, points, via_Jacobi=via_Jacobi)
             fc = F \ f0.(axes(F,1))
             (θs, rs, vals) = finite_plotvalues(F, fc)
             vals_, err = inf_error(F, θs, rs, vals, f0)
@@ -48,11 +53,12 @@ end
             M = F' * F
             @test length(M) == 2N-1
             @test size(M[1]) == (K*N/2-(K-1), K*N/2-(K-1))
-            @test size(M[end]) == (7, 7)
+            @test size(M[end]) == (2K+1, 2K+1)
             ∇ = Derivative(axes(F,1)); Δ = (∇*F)' * (∇*F)
             @test length(Δ) == 2N-1
             @test size(Δ[1]) == (K*N/2-(K-1), K*N/2-(K-1))
-            @test size(Δ[end]) == (7, 7)
+            @test size(Δ[end]) == (2K+1, 2K+1)
+            # NIntegrate[Integrate[Exp[-10*(r^2*Cos[y]^2 + (r*Sin[y]-0.6)^2)]^2* (1-r^2)^2*(r^2-0.2^2)^2*r,{r,0.2,1}],{y,0,2 Pi}]
             @test sum(transpose.(fc) .* (M .* fc)) ≈  0.0055779595855720305
             @test sum(transpose.(fc) .* (Δ .* fc)) ≈  0.16873822986436868
 
@@ -61,7 +67,7 @@ end
             N = 50; points = [0.0; 0.5; 0.8; 1.0]
             K = length(points)-1
 
-            F = FiniteContinuousZernike(N, points, via_Jacobi)
+            F = FiniteContinuousZernike(N, points, via_Jacobi=via_Jacobi)
             fc = F \ f0.(axes(F,1))
             (θs, rs, vals) = finite_plotvalues(F, fc)
             vals_, err = inf_error(F, θs, rs, vals, f0)
@@ -69,14 +75,33 @@ end
             M = F' * F
             @test length(M) == 2N-1
             @test size(M[1]) == (K*(N/2-1), K*(N/2-1))
-            @test size(M[end]) == (6, 6)
+            @test size(M[end]) == (2K, 2K)
             ∇ = Derivative(axes(F,1)); Δ = (∇*F)' * (∇*F)
             @test length(Δ) == 2N-1
             @test size(Δ[1]) == (K*(N/2-1), K*(N/2-1))
-            @test size(Δ[end]) == (6, 6)
+            @test size(Δ[end]) == (2K, 2K)
+            # NIntegrate[Integrate[Exp[-10*(r^2*Cos[y]^2 + (r*Sin[y]-0.6)^2)]^2* (1-r^2)^2*(r^2-0.2^2)^2*r,{r,0,1}],{y,0,2 Pi}]
             @test sum(transpose.(fc) .* (M .* fc)) ≈  0.005578088780274445
             @test sum(transpose.(fc) .* (Δ .* fc)) ≈ 0.16877589535690113
         end
+    end
+
+    @testset "weighted mass matrix" begin
+        Memoization.empty_all_caches!()
+        ρ = 0.2
+        N = 50; points = [0.2; 0.5; 0.8]
+        K = length(points)-1
+
+        # Just annuli elements
+        F = FiniteContinuousZernike(N, points)
+        fc = F \ plane_wave.(axes(F,1))
+        λ(r²) = sin(r²)
+        M = F' * (λ.(axes(F,1)) .* F)
+        @test length(M) == 2N-1
+        @test size(M[1]) == (K*N/2-(K-1), K*N/2-(K-1))
+        @test size(M[end]) == (2K+1, 2K+1)
+        # NIntegrate[Integrate[Sin[10*r*Cos[y]]^2*Sin[r^2]*r,{r,0.2,0.8}],{y,0,2 Pi}]
+        @test   sum(transpose.(fc) .* (M .* fc)) ≈  0.3040061959548193
     end
 
 end
