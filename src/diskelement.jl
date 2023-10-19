@@ -103,6 +103,9 @@ end
     Vcat([T[ρ^2]; T[ρ^2/sqrt(B.m+2)]; Zeros{T}(∞)]', M)
 end
 
+###
+# Assembly with Helmholtz coefficient
+###
 @simplify function *(A::QuasiAdjoint{<:Any,<:ContinuousZernikeElementMode}, B::BroadcastQuasiMatrix{<:Any, typeof(*), <:Tuple{BroadcastQuasiVector, <:ContinuousZernikeElementMode}})
     λ, C = B.args
     T = promote_type(eltype(A), eltype(C))

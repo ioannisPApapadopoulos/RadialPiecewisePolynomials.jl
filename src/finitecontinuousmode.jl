@@ -19,7 +19,7 @@ function FiniteContinuousZernikeMode(N::Int, points::AbstractVector{T}, m::Int, 
     @assert m == 0 ? j == 1 : 0 ≤ j ≤ 1
     K = first(points) ≈ 0 ? length(points)-2 : length(points) - 1
     @assert length(L₁₁) == length(L₀₁) == length(L₁₀) == length(D) == (same_ρs ? 1 : K)
-    @assert length(normalize_constants) ≥ 2
+    # @assert length(normalize_constants) ≥ 2
     FiniteContinuousZernikeMode{T}(N, points, m, j, L₁₁, L₀₁, L₁₀, D, normalize_constants, via_Jacobi, same_ρs, m+2N)
 end
 
@@ -184,7 +184,7 @@ function _build_second_block(F::FiniteContinuousZernikeMode{T}, Ms, γs::Abstrac
         append!(dv, [zeros(T, K)])
         if p ≈ 0
             append!(ev, [zeros(T, K-1)])
-            dv[j][1] = j == 1 ? Ms[1][1,2] * γs[1] : zero(T)
+            dv[j][1] = Ms[1][1,j+1] * γs[1]
             ev[j][1] = Ms[2][1,j+2]
             for i in 2:K-1
                 dv[j][i] = Ms[i][2,j+2] * γs[i]
