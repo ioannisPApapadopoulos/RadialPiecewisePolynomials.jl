@@ -260,9 +260,9 @@ end
 end
 
 @simplify function *(A::QuasiAdjoint{<:Any,<:FiniteContinuousZernikeMode}, B::BroadcastQuasiMatrix{<:Any, typeof(*), <:Tuple{BroadcastQuasiVector, FiniteContinuousZernikeMode}})
-
     λ, F = B.args
-    N, K = F.N, length(F.points)-1
+    T = promote_type(eltype(A), eltype(F))
+    N = F.N
     @assert A' == F
 
     Cs = _getCs(F)
@@ -271,7 +271,11 @@ end
 
     # figure out necessary bandwidth
     # bs for number of bubbles
-    bs = min(N-2, maximum([last(colsupport(view(Ms[i], :, 1)[:]))-2 for i in 1:lastindex(Ms)]))
+    if first(F.points) ≈ 0
+        bs = min(N-2, maximum(vcat([last(findall(x->abs(x) > 10*eps(T), Ms[1][1:N+3,1]))],[last(colsupport(view(Ms[i], :, 1)[:]))-2 for i in 2:lastindex(Ms)])))
+    else
+        bs = min(N-2, maximum([last(colsupport(view(Ms[i], :, 1)[:]))-2 for i in 1:lastindex(Ms)]))
+    end
     γs = _getγs(F)
     return _arrow_head_matrix(F, Ms, γs, N, bs, first(F.points))
 end

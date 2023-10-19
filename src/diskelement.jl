@@ -103,6 +103,30 @@ end
     Vcat([T[ρ^2]; T[ρ^2/sqrt(B.m+2)]; Zeros{T}(∞)]', M)
 end
 
+@simplify function *(A::QuasiAdjoint{<:Any,<:ContinuousZernikeElementMode}, B::BroadcastQuasiMatrix{<:Any, typeof(*), <:Tuple{BroadcastQuasiVector, <:ContinuousZernikeElementMode}})
+    λ, C = B.args
+    T = promote_type(eltype(A), eltype(C))
+    @assert A' == C
+
+    ρ = convert(T, last(C.points))
+    m = C.m
+
+    L₁₁ = ρ / sqrt(2*one(T)) * (Weighted(Normalized(Jacobi{T}(0,m))) \ Weighted(Normalized(Jacobi{T}(1,m))))
+    L = Hcat(Vcat(ρ*one(T), Zeros{T}(∞)), L₁₁)
+
+    # We need to compute the Jacobi matrix multiplier addition due to the
+    # variable Helmholtz coefficient λ(r²). We expand λ(r²) in chebyshevt
+    # and then use Clenshaw to compute λ(ρ^2*(X-I)/2) where X is the 
+    # correponding Jacobi matrix for this basis.
+    Tn = chebyshevt(C.points[1]..C.points[2])
+    u = Tn \ λ.f.(axes(Tn,1))
+    X = jacobimatrix(Normalized(Jacobi(0, m)))
+    W = Clenshaw(paddeddata(u), recurrencecoefficients(Tn)..., ρ^2*(X+I)/2, _p0(Tn))
+
+    # TODO fix the excess zeros
+    return ApplyArray(*, L', ApplyArray(*, W, L))
+end
+
 ###
 # Gradient and L2 inner product of gradient
 ##

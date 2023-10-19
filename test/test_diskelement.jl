@@ -159,4 +159,35 @@ import MultivariateOrthogonalPolynomials: Zernike, ModalTrav
         # NumberForm[Integrate[Integrate[D[Exp[-r^2]*r*Cos[y], r]^2*r + D[Exp[-r^2]*r*Cos[y], y]^2/r, {r, 0, 0.6}], {y, 0, 2 Pi}], 16]
         @test f[1:N]' * Δ[1:N,1:N] * f[1:N] ≈ 0.608026291510947 # mathematica
     end
+
+    @testset "assembly" begin
+        # Test weighted mass matrix (m = 0)
+        ρ = 0.7;
+        C = ContinuousZernikeElementMode([0; ρ], 0, 1);
+        x = axes(C, 1);
+        f = C \ f0.(x);
+        λ(r2) = r2;
+        # weighted mass matrix
+        Z = C' * (λ.(axes(C,1)).*C);
+        N=20;
+        # Integrate[Integrate[Exp[-r^2]^2*r^3, {r, 0.0, 0.7}], {y, 0, 2 Pi}]
+        @test f[1:N]' * Z[1:N,1:N] * f[1:N] ≈ 0.2017562408711249 # mathematica
+
+        λ(r2) = sin(r2);
+        Z = C' * (λ.(axes(C,1)).*C);
+        # Integrate[Integrate[Exp[-r^2]^2*Sin[r^2]*r, {r, 0.0, 0.7}], {y, 0, 2 Pi}]
+        @test f[1:N]' * Z[1:N,1:N] * f[1:N] ≈ 0.1982900692096337 # mathematica
+
+        C = ContinuousZernikeElementMode([0; ρ], 1, 1)
+        f = C \ f1c.(axes(C,1))
+        λ(r2) = r2;
+        Z = C' * (λ.(axes(C,1)).*C);
+        # Integrate[Integrate[Exp[-r^2]^2*r^2*Cos[2y]^2*r^3,{r,0.0,0.7}],{y,0,2 Pi}]
+        @test f[1:N]' * Z[1:N,1:N] * f[1:N] ≈ 0.03010416811305223 # mathematica
+
+        λ(r2) = sin(r2);
+        Z = C' * (λ.(axes(C,1)).*C);
+        # Integrate[Integrate[Exp[-r^2]^2*r^2*Cos[2y]^2*r*Sin[r^2],{r,0.0,0.7}],{y,0,2 Pi}]
+        @test f[1:N]' * Z[1:N,1:N] * f[1:N] ≈ 0.02944935727348015 # mathematica
+    end
 end
