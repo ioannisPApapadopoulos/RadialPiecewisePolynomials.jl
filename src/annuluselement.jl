@@ -256,7 +256,7 @@ end
 
     # We need to compute the Jacobi matrix multiplier addition due to the
     # variable Helmholtz coefficient λ(r²). We expand λ(r²) in chebyshevt
-    # and then use Clenshaw to compute λ(β^2*(I-X)/t) where X is the 
+    # and then use Clenshaw to compute λ(β^2*(I-X/t)) where X is the 
     # correponding Jacobi matrix for this basis.
     Tn = chebyshevt(C.points[1]..C.points[2])
     u = Tn \ λ.f.(axes(Tn,1))

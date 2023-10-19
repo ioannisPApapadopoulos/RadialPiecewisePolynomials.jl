@@ -219,7 +219,7 @@ import RadialPiecewisePolynomials: ModalTrav, Fill, ApplyArray
         @test f[1:N]' * Δ[1:N,1:N] * f[1:N] ≈ 0.4918978196760503 # mathematica
     end
 
-    @testset "weighted mass matrix" begin
+    @testset "assembly" begin
         Memoization.empty_all_caches!()
         # Test weighted mass matrix (m = 0)
         α = 0.5; β = 0.7;

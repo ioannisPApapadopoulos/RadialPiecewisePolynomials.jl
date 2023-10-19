@@ -19,7 +19,7 @@ function FiniteContinuousZernikeMode(N::Int, points::AbstractVector{T}, m::Int, 
     @assert m == 0 ? j == 1 : 0 ≤ j ≤ 1
     K = first(points) ≈ 0 ? length(points)-2 : length(points) - 1
     @assert length(L₁₁) == length(L₀₁) == length(L₁₀) == length(D) == (same_ρs ? 1 : K)
-    @assert length(normalize_constants) ≥ 2
+    # @assert length(normalize_constants) ≥ 2
     FiniteContinuousZernikeMode{T}(N, points, m, j, L₁₁, L₀₁, L₁₀, D, normalize_constants, via_Jacobi, same_ρs, m+2N)
 end
 
@@ -184,7 +184,7 @@ function _build_second_block(F::FiniteContinuousZernikeMode{T}, Ms, γs::Abstrac
         append!(dv, [zeros(T, K)])
         if p ≈ 0
             append!(ev, [zeros(T, K-1)])
-            dv[j][1] = j == 1 ? Ms[1][1,2] * γs[1] : zero(T)
+            dv[j][1] = Ms[1][1,j+1] * γs[1]
             ev[j][1] = Ms[2][1,j+2]
             for i in 2:K-1
                 dv[j][i] = Ms[i][2,j+2] * γs[i]
@@ -260,9 +260,9 @@ end
 end
 
 @simplify function *(A::QuasiAdjoint{<:Any,<:FiniteContinuousZernikeMode}, B::BroadcastQuasiMatrix{<:Any, typeof(*), <:Tuple{BroadcastQuasiVector, FiniteContinuousZernikeMode}})
-
     λ, F = B.args
-    N, K = F.N, length(F.points)-1
+    T = promote_type(eltype(A), eltype(F))
+    N = F.N
     @assert A' == F
 
     Cs = _getCs(F)
@@ -271,7 +271,11 @@ end
 
     # figure out necessary bandwidth
     # bs for number of bubbles
-    bs = min(N-2, maximum([last(colsupport(view(Ms[i], :, 1)[:]))-2 for i in 1:lastindex(Ms)]))
+    if first(F.points) ≈ 0
+        bs = min(N-2, maximum(vcat([last(findall(x->abs(x) > 10*eps(T), Ms[1][1:N+3,1]))],[last(colsupport(view(Ms[i], :, 1)[:]))-2 for i in 2:lastindex(Ms)])))
+    else
+        bs = min(N-2, maximum([last(colsupport(view(Ms[i], :, 1)[:]))-2 for i in 1:lastindex(Ms)]))
+    end
     γs = _getγs(F)
     return _arrow_head_matrix(F, Ms, γs, N, bs, first(F.points))
 end

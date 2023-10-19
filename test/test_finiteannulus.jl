@@ -86,9 +86,8 @@ end
         end
     end
 
-    @testset "weighted mass matrix" begin
+    @testset "assembly" begin
         Memoization.empty_all_caches!()
-        ρ = 0.2
         N = 50; points = [0.2; 0.5; 0.8]
         K = length(points)-1
 
@@ -101,7 +100,17 @@ end
         @test size(M[1]) == (K*N/2-(K-1), K*N/2-(K-1))
         @test size(M[end]) == (2K+1, 2K+1)
         # NIntegrate[Integrate[Sin[10*r*Cos[y]]^2*Sin[r^2]*r,{r,0.2,0.8}],{y,0,2 Pi}]
-        @test   sum(transpose.(fc) .* (M .* fc)) ≈  0.3040061959548193
+        @test sum(transpose.(fc) .* (M .* fc)) ≈  0.3040061959548193
+
+        # disk + annulus element
+        F = FiniteContinuousZernike(N, [0.0;0.5;0.8])
+        fc = F \ plane_wave.(axes(F,1))
+        M = F' * (λ.(axes(F,1)) .* F)
+        @test length(M) == 2N-1
+        @test size(M[1]) == (K*(N/2-1), K*(N/2-1))
+        @test size(M[end]) == (2K, 2K)
+        # NIntegrate[Integrate[Sin[10*r*Cos[y]]^2*Sin[r^2]*r,{r,0.0,0.8}],{y,0,2 Pi}]
+        @test sum(transpose.(fc) .* (M .* fc)) ≈  0.3055743848155512
     end
 
 end
