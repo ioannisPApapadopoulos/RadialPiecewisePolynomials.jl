@@ -83,6 +83,27 @@ end
             # NIntegrate[Integrate[Exp[-10*(r^2*Cos[y]^2 + (r*Sin[y]-0.6)^2)]^2* (1-r^2)^2*(r^2-0.2^2)^2*r,{r,0,1}],{y,0,2 Pi}]
             @test sum(transpose.(fc) .* (M .* fc)) ≈  0.005578088780274445
             @test sum(transpose.(fc) .* (Δ .* fc)) ≈ 0.16877589535690113
+
+            # just disk element
+            N = 50; points = [0.0;1.0]
+            K = length(points)-1
+
+            F = FiniteContinuousZernike(N, points, via_Jacobi=via_Jacobi)
+            fc = F \ f0.(axes(F,1))
+            (θs, rs, vals) = finite_plotvalues(F, fc)
+            vals_, err = inf_error(F, θs, rs, vals, f0)
+            @test err < 1e-14
+            M = F' * F
+            @test length(M) == 2N-1
+            @test size(M[1]) == (K*(N/2-1), K*(N/2-1))
+            @test size(M[end]) == (2K, 2K)
+            ∇ = Derivative(axes(F,1)); Δ = (∇*F)' * (∇*F)
+            @test length(Δ) == 2N-1
+            @test size(Δ[1]) == (K*(N/2-1), K*(N/2-1))
+            @test size(Δ[end]) == (2K, 2K)
+            # NIntegrate[Integrate[Exp[-10*(r^2*Cos[y]^2 + (r*Sin[y]-0.6)^2)]^2* (1-r^2)^2*(r^2-0.2^2)^2*r,{r,0,1}],{y,0,2 Pi}]
+            @test sum(transpose.(fc) .* (M .* fc)) ≈  0.005578088780274445
+            @test sum(transpose.(fc) .* (Δ .* fc)) ≈ 0.16877589535690113
         end
     end
 
@@ -109,6 +130,16 @@ end
         @test length(M) == 2N-1
         @test size(M[1]) == (K*(N/2-1), K*(N/2-1))
         @test size(M[end]) == (2K, 2K)
+        # NIntegrate[Integrate[Sin[10*r*Cos[y]]^2*Sin[r^2]*r,{r,0.0,0.8}],{y,0,2 Pi}]
+        @test sum(transpose.(fc) .* (M .* fc)) ≈  0.3055743848155512
+
+        # just disk element
+        F = FiniteContinuousZernike(N, [0.0;0.8])
+        fc = F \ plane_wave.(axes(F,1))
+        M = F' * (λ.(axes(F,1)) .* F)
+        @test length(M) == 2N-1
+        @test size(M[1]) == ((N/2-1), (N/2-1))
+        @test size(M[end]) == (2, 2)
         # NIntegrate[Integrate[Sin[10*r*Cos[y]]^2*Sin[r^2]*r,{r,0.0,0.8}],{y,0,2 Pi}]
         @test sum(transpose.(fc) .* (M .* fc)) ≈  0.3055743848155512
     end

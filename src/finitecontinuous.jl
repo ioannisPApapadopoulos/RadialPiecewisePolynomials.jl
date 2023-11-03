@@ -79,36 +79,42 @@ function _getFs(N::Int, points::AbstractVector{T}, via_Jacobi::Bool) where T
         append!(ρs, [α / β])
     end
 
-    # If all ρs are the same, then we can reduce the computational
-    # overhead by only considering one hierarchy of semiclassical
-    # Jacobi polynomials for all the cells.
-    if all(ρs .≈ ρs[1])
-        ρs = [ρs[1]]
-        κ = K
-        same_ρs = true
-    end
+    if !isempty(ρs)
+        # If all ρs are the same, then we can reduce the computational
+        # overhead by only considering one hierarchy of semiclassical
+        # Jacobi polynomials for all the cells.
+        if all(ρs .≈ ρs[1])
+            ρs = [ρs[1]]
+            κ = K
+            same_ρs = true
+        end
 
-    # Semiclassical Jacobi parameter t
-    ts = inv.(one(T) .- ρs.^2)
+        # Semiclassical Jacobi parameter t
+        ts = inv.(one(T) .- ρs.^2)
 
-    # Use broadcast notation to compute all the lowering matrices across all
-    # intervals and Fourier modes simultaneously.
+        # Use broadcast notation to compute all the lowering matrices across all
+        # intervals and Fourier modes simultaneously.
 
-    if via_Jacobi
-        Ls = _ann2element_via_Jacobi.(ts)
-        cst = [[sum.(SemiclassicalJacobiWeight.(t,1,1,0:ms[end])) for t in ts],
-                [sum.(SemiclassicalJacobiWeight.(t,2,0,0:ms[end])) for t in ts],
-                [sum.(SemiclassicalJacobiWeight.(t,0,2,0:ms[end])) for t in ts]]
+        if via_Jacobi
+            Ls = _ann2element_via_Jacobi.(ts)
+            cst = [[sum.(SemiclassicalJacobiWeight.(t,1,1,0:ms[end])) for t in ts],
+                    [sum.(SemiclassicalJacobiWeight.(t,2,0,0:ms[end])) for t in ts],
+                    [sum.(SemiclassicalJacobiWeight.(t,0,2,0:ms[end])) for t in ts]]
+        else
+            Ls = _ann2element_via_lowering.(ts)
+            cst = [[sum.(SemiclassicalJacobiWeight.(t,a,a,0:ms[end])) for t in ts] for a in 1:-1:0]
+        end
+
+        # Use broadcast notation to compute all the derivative matrices across
+        # all the intervals and Fourier modes simultaneously
+        Z = ZernikeAnnulus{T}.(ρs,1,1)
+        Ds = (Z .\ (Laplacian.(axes.(Z,1)).*Weighted.(Z)))
+        Ds = [Ds[i].ops for i in 1:K+1-κ];
     else
-        Ls = _ann2element_via_lowering.(ts)
-        cst = [[sum.(SemiclassicalJacobiWeight.(t,a,a,0:ms[end])) for t in ts] for a in 1:-1:0]
+        ts = []
+        cst = [[]]
     end
 
-    # Use broadcast notation to compute all the derivative matrices across
-    # all the intervals and Fourier modes simultaneously
-    Z = ZernikeAnnulus{T}.(ρs,1,1)
-    Ds = (Z .\ (Laplacian.(axes.(Z,1)).*Weighted.(Z)))
-    Ds = [Ds[i].ops for i in 1:K+1-κ];
 
     # Loop over the Fourier modes
     Fs = []
@@ -128,7 +134,7 @@ function _getFs(N::Int, points::AbstractVector{T}, via_Jacobi::Bool) where T
         
         D = NTuple{K+1-κ, AbstractMatrix}([Ds[i][m+1] for i in 1:K+1-κ])
 
-        normalize_constants = [[cst[k][i][m+1] for k in 1:lastindex(cst)] for i in 1:K+1-κ]
+        normalize_constants = Vector{T}[T[cst[k][i][m+1] for k in 1:lastindex(cst)] for i in 1:K+1-κ]
 
         # Construct the structs for each Fourier mode seperately
         append!(Fs, [FiniteContinuousZernikeMode(M, points, m, j, L₁₁, L₀₁, L₁₀, D, normalize_constants, via_Jacobi, same_ρs, N)])
@@ -201,14 +207,14 @@ end
 #     zero_dirichlet_bcs!.(Fs, Δ)
 # end
 
-function zero_dirichlet_bcs!(F::FiniteContinuousZernike{T}, Δ::AbstractVector{<:AbstractMatrix{T}}) where T
+function zero_dirichlet_bcs!(F::FiniteContinuousZernike{T}, Δ::AbstractVector{<:AbstractMatrix}) where T
     @assert length(Δ) == 2*F.N-1
     # @assert Δ[1] isa LinearAlgebra.Symmetric{T, <:ArrowheadMatrix{T}}
     Fs = F.Fs #_getFs(F.N, F.points)
     zero_dirichlet_bcs!.(Fs, Δ)
 end
 
-function zero_dirichlet_bcs!(F::FiniteContinuousZernike{T}, Mf::AbstractVector{<:PseudoBlockVector{T}}) where T
+function zero_dirichlet_bcs!(F::FiniteContinuousZernike{T}, Mf::AbstractVector{<:PseudoBlockVector}) where T
     @assert length(Mf) == 2*F.N-1
     Fs = F.Fs #_getFs(F.N, F.points)
     zero_dirichlet_bcs!.(Fs, Mf)
@@ -233,10 +239,12 @@ function _bubble2disk_or_ann_all_modes(F::FiniteContinuousZernike, us::AbstractV
         m = ms[i]
         γs = _getγs(points, m)
         append!(γs, one(T))
-        if first(points) ≈ 0 && K > 1
+        if first(points) ≈ 0
             Us[1:Ms[i]-1,i,1] = [us[i][1]*γs[1];us[i][K+1:K:end]]
-            for k = 1:K-1 
-                Us[1:Ms[i],i,k+1] = [us[i][k];us[i][k+1]*γs[k+1];us[i][(K+k+1):K:end]] 
+            if K > 1
+                for k = 1:K-1
+                    Us[1:Ms[i],i,k+1] = [us[i][k];us[i][k+1]*γs[k+1];us[i][(K+k+1):K:end]] 
+                end
             end
         else
             for k = 1:K 
@@ -264,10 +272,11 @@ function _bubble2disk_or_ann_all_modes(F::FiniteContinuousZernike, us::AbstractV
 end
 
 
-function finite_plotvalues(F::FiniteContinuousZernike, us::AbstractVector; N=0)
+function finite_plotvalues(F::FiniteContinuousZernike, us::AbstractVector; N=0, K=0)
     T = eltype(F)
     _, Ũs = _bubble2disk_or_ann_all_modes(F, us)
-    points, K = T.(F.points), length(F.points)-1
+    points = T.(F.points)
+    K = K==0 ? length(F.points)-1 : K
     N = N == 0 ? F.N : N
     θs, rs, vals = [], [], []
     for k in 1:K
@@ -301,11 +310,11 @@ function _inf_error(K::Int, θs::AbstractVector, rs::AbstractVector, vals::Abstr
     for k = 1:K
         append!(vals_, [abs.(vals[k] - u.(RadialCoordinate.(rs[k],θs[k]')))])
     end
-    vals_, sum(maximum.(vals_))
+    vals_, norm((norm.(vals_, Inf)), Inf)
 end
 
-function inf_error(F::FiniteContinuousZernike{T}, θs::AbstractVector, rs::AbstractVector, vals::AbstractVector, u::Function) where T
-    K = lastindex(F.points)-1
+function inf_error(F::FiniteContinuousZernike{T}, θs::AbstractVector, rs::AbstractVector, vals::AbstractVector, u::Function;K=0) where T
+    K = K==0 ? lastindex(F.points)-1 : K
     _inf_error(K, θs, rs, vals, u)
 end
 

@@ -4,13 +4,17 @@ using PyPlot, DelimitedFiles, LaTeXStrings
 ### Helper plot functions
 #######
 
-function _plot(K::Int, θs::AbstractVector, rs::AbstractVector, vals::AbstractVector;ρ::T=0.0, ttl=[]) where T
-    # PyPlot.rc("font", family="serif", size=14)
-    # rcParams = PyPlot.PyDict(PyPlot.matplotlib["rcParams"])
-    # rcParams["text.usetex"] = true
+function _plot(K::Int, θs::AbstractVector, rs::AbstractVector, vals::AbstractVector;ρ::T=0.0, ttl=[], vminmax=[]) where T
+    PyPlot.rc("font", family="serif", size=14)
+    rcParams = PyPlot.PyDict(PyPlot.matplotlib["rcParams"])
+    rcParams["text.usetex"] = true
     fig = plt.figure()
     ax = fig.add_subplot(111, projection="polar")
-    vmin,vmax = minimum(minimum.(vals)), maximum(maximum.(vals))
+    if vminmax == []
+        vmin,vmax = minimum(minimum.(vals)), maximum(maximum.(vals))
+    else
+        vmin,vmax = vminmax[1], vminmax[2]
+    end
     norm = PyPlot.matplotlib.colors.Normalize(vmin=vmin, vmax=vmax)
 
     if ρ > 0.0
@@ -34,18 +38,18 @@ function _plot(K::Int, θs::AbstractVector, rs::AbstractVector, vals::AbstractVe
     display(gcf())
 end
 
-function plot(F::FiniteContinuousZernike{T}, θs::AbstractVector, rs::AbstractVector, vals::AbstractVector;ρ::T=0.0, ttl=[]) where T
-    K = lastindex(F.points)-1
+function plot(F::FiniteContinuousZernike{T}, θs::AbstractVector, rs::AbstractVector, vals::AbstractVector;ρ::T=0.0, ttl=[], vminmax=[],K=0) where T
+    K = K ==0 ? lastindex(Z.points)-1 : K
+    _plot(K, θs, rs, vals, ρ=ρ, ttl=ttl, vminmax=vminmax)
+end
+
+function plot(F::FiniteContinuousZernikeMode{T}, θs::AbstractVector, rs::AbstractVector, vals::AbstractVector;ρ::T=0.0, ttl=[], K=0) where T
+    K = K ==0 ? lastindex(Z.points)-1 : K
     _plot(K, θs, rs, vals, ρ=ρ, ttl=ttl)
 end
 
-function plot(F::FiniteContinuousZernikeMode{T}, θs::AbstractVector, rs::AbstractVector, vals::AbstractVector;ρ::T=0.0, ttl=[]) where T
-    K = lastindex(F.points)-1
-    _plot(K, θs, rs, vals, ρ=ρ, ttl=ttl)
-end
-
-function plot(Z::FiniteZernikeBasis{T}, θs::AbstractVector, rs::AbstractVector, vals::AbstractVector;ρ::T=0.0, ttl=[]) where T
-    K = lastindex(Z.points)-1
+function plot(Z::FiniteZernikeBasis{T}, θs::AbstractVector, rs::AbstractVector, vals::AbstractVector;ρ::T=0.0, ttl=[], K=0) where T
+    K = K ==0 ? lastindex(Z.points)-1 : K
     _plot(K, θs, rs, vals, ρ=ρ, ttl=ttl)
 end
 
