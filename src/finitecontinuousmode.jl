@@ -86,6 +86,7 @@ end
 function _getγs(points::AbstractArray{T}, m::Int) where T
     K = length(points)-1
     first(points) > 0 && return [(one(T)-(points[k+1]/points[k+2])^2)*(points[k+1]/points[k+2])^m / (one(T)-(points[k]/points[k+1])^2) for k in 1:K-1]
+    K == 1 && return T[]
     γ = [(one(T)-(points[k+1]/points[k+2])^2)*(points[k+1]/points[k+2])^m / (one(T)-(points[k]/points[k+1])^2) for k in 2:K-1]
     return append!([(one(T)-(points[2]/points[3])^2)*(points[2]/points[3])^m / (sqrt(convert(T,2)^(m+2-iszero(m))/π) * normalizedjacobip(0, 0, m, 1.0))],γ)
 end
@@ -121,7 +122,11 @@ function ldiv(F::FiniteContinuousZernikeMode{T}, f::AbstractQuasiVector) where T
 
     bubbles = zeros(T, N-2, K)
     if first(points) ≈ 0
-        hats = vcat([fs[i][1] for i in 2:K-1], fs[end][1:2])
+        if K == 1
+            hats = [fs[1][1]]
+        else
+            hats = vcat([fs[i][1] for i in 2:K-1], fs[end][1:2])
+        end
         bubbles[:,1] = fs[1][2:N-1]
         for i in 2:K bubbles[:,i] = fs[i][3:N] end
     else
@@ -141,21 +146,25 @@ end
 function _build_top_left_block(F::FiniteContinuousZernikeMode{T}, Ms, γs::AbstractArray{T}, p::T) where T
     K = length(Ms)
     if p ≈ 0
-        a = [Ms[1][1,1]]
-        for i in 2:K
-            append!(a, [Ms[i][1,1]; Ms[i][2,2]])
+        if K > 1
+            a = [Ms[1][1,1]]
+            for i in 2:K
+                append!(a, [Ms[i][1,1]; Ms[i][2,2]])
+            end
+
+            dv = zeros(T, K)
+            dv[1] = a[1]*γs[1]^2 + a[2];
+            dv[end] = a[end];
+
+            for i in 1:K-2 dv[i+1] = a[2i+1]*γs[i+1]^2 + a[2i+2] end
+
+            ev = zeros(T, K-1)
+            γs = vcat(γs, one(T))
+
+            for i in 2:K ev[i-1] = Ms[i][1,2] * γs[i] end
+        else
+            dv = [Ms[1][1,1]]
         end
-
-        dv = zeros(T, K)
-        dv[1] = a[1]*γs[1]^2 + a[2];
-        dv[end] = a[end];
-
-        for i in 1:K-2 dv[i+1] = a[2i+1]*γs[i+1]^2 + a[2i+2] end
-
-        ev = zeros(T, K-1)
-        γs = vcat(γs, one(T))
-
-        for i in 2:K ev[i-1] = Ms[i][1,2] * γs[i] end
     else
         a = []
         for i in 1:K
@@ -171,7 +180,9 @@ function _build_top_left_block(F::FiniteContinuousZernikeMode{T}, Ms, γs::Abstr
         for i in 1:K ev[i] = Ms[i][1,2] * γs[i] end
 
     end
-    Symmetric(BandedMatrix{T}(0=>dv, 1=>ev))
+
+    K == 1 && return Symmetric(BandedMatrix{T}(0=>dv))
+    return Symmetric(BandedMatrix{T}(0=>dv, 1=>ev))
 end
 
 # Interaction of the hats with the bubbles
@@ -185,12 +196,14 @@ function _build_second_block(F::FiniteContinuousZernikeMode{T}, Ms, γs::Abstrac
         if p ≈ 0
             append!(ev, [zeros(T, K-1)])
             dv[j][1] = Ms[1][1,j+1] * γs[1]
-            ev[j][1] = Ms[2][1,j+2]
-            for i in 2:K-1
-                dv[j][i] = Ms[i][2,j+2] * γs[i]
-                ev[j][i] = Ms[i+1][1,j+2]
+            if K > 1
+                ev[j][1] = Ms[2][1,j+2]
+                for i in 2:K-1
+                    dv[j][i] = Ms[i][2,j+2] * γs[i]
+                    ev[j][i] = Ms[i+1][1,j+2]
+                end
+                dv[j][K] = Ms[K][2,j+2]
             end
-            dv[j][K] = Ms[K][2,j+2]
         else
             append!(ev, [zeros(T, K)])
             for i in 1:K
@@ -200,6 +213,7 @@ function _build_second_block(F::FiniteContinuousZernikeMode{T}, Ms, γs::Abstrac
         end
     end
     if p ≈ 0
+        K == 1 && return [BandedMatrix{T}(0=>dv[j]) for j in 1:bs]
         return [BandedMatrix{T}(0=>dv[j], 1=>ev[j]) for j in 1:bs]
     else
         return [BandedMatrix{T}((0=>dv[j], -1=>ev[j]), (K+1, K)) for j in 1:bs]
@@ -211,7 +225,7 @@ function _build_trailing_bubbles(F::FiniteContinuousZernikeMode{T}, Ms, N::Int, 
     K = length(Ms)
     if p ≈ 0
         # Mn = vcat([Ms[1][2:N-1,2:N-1]], [Ms[i][3:N, 3:N] for i in 2:K])
-        Mn = vcat([reshape(view(Ms[1],2:N-1,2:N-1)[:], N-2, N-2)], [reshape(view(Ms[i],3:N, 3:N)[:], N-2, N-2) for i in 2:K])
+        Mn = vcat([Ms[1][2:N-1,2:N-1]], [reshape(view(Ms[i],3:N, 3:N)[:], N-2, N-2) for i in 2:K])
     else
         # Mn = [Ms[i][3:N, 3:N] for i in 1:K]
         Mn = [reshape(view(Ms[i],3:N, 3:N)[:], N-2, N-2) for i in 1:K]
@@ -259,6 +273,9 @@ end
     end
 end
 
+###
+# Assembly
+###
 @simplify function *(A::QuasiAdjoint{<:Any,<:FiniteContinuousZernikeMode}, B::BroadcastQuasiMatrix{<:Any, typeof(*), <:Tuple{BroadcastQuasiVector, FiniteContinuousZernikeMode}})
     λ, F = B.args
     T = promote_type(eltype(A), eltype(F))
@@ -339,7 +356,7 @@ function zero_dirichlet_bcs!(F::FiniteContinuousZernikeMode{T}, Δ::LinearAlgebr
     end
 end
 
-function zero_dirichlet_bcs!(F::FiniteContinuousZernikeMode{T}, A::Matrix{T}) where T
+function zero_dirichlet_bcs!(F::FiniteContinuousZernikeMode{T}, A::Matrix) where T
     points = F.points
     K = length(points)-1
     if first(points) > 0
@@ -352,7 +369,7 @@ function zero_dirichlet_bcs!(F::FiniteContinuousZernikeMode{T}, A::Matrix{T}) wh
     end
 end
 
-function zero_dirichlet_bcs!(F::FiniteContinuousZernikeMode{T}, Mf::PseudoBlockVector{T}) where T
+function zero_dirichlet_bcs!(F::FiniteContinuousZernikeMode{T}, Mf::PseudoBlockVector) where T
     points = F.points
     K = length(points)-1
     if !(first(points) ≈  0)

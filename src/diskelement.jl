@@ -68,7 +68,7 @@ function ldiv(C::ContinuousZernikeElementMode{T}, f::AbstractQuasiVector) where 
     end
 
     # Seems to cache on its own, no need to memoize unlike annulus
-    c = Z0 \ f̃ # Zernike transform
+    c = pad(Z0[:,Block.(1:200)] \ f̃, axes(Z0,2)) # Zernike transform
     c̃ = ModalTrav(paddeddata(c))
     N = size(c̃.matrix, 1) # degree
     

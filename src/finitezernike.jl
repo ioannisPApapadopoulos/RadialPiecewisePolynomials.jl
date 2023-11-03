@@ -313,9 +313,10 @@ function _bubble2disk_or_ann_all_modes(Z::FiniteZernikeBasis{T}, us::AbstractVec
 end
 
 
-function finite_plotvalues(Z::FiniteZernikeBasis{T}, us::AbstractVector; N=0) where T
+function finite_plotvalues(Z::FiniteZernikeBasis{T}, us::AbstractVector; N=0, K=0) where T
     _, Ũs = _bubble2disk_or_ann_all_modes(Z, us)
-    points, K = T.(Z.points), length(Z.points)-1
+    points= T.(Z.points)
+    K = K==0 ? lastindex(Z.points)-1 : K
     N = N == 0 ? Z.N : N
     Zs = Z.Zs
     θs=[]; rs=[]; vals = []   
@@ -341,8 +342,8 @@ function finite_plotvalues(Z::FiniteZernikeBasis{T}, us::AbstractVector; N=0) wh
 end
 
 ### Error collection
-function inf_error(Z::FiniteZernikeBasis{T}, θs::AbstractVector, rs::AbstractVector, vals::AbstractVector, u::Function) where T
-    K = lastindex(Z.points)-1
+function inf_error(Z::FiniteZernikeBasis{T}, θs::AbstractVector, rs::AbstractVector, vals::AbstractVector, u::Function; K=0) where T
+    K = K==0 ? lastindex(Z.points)-1 : K
     _inf_error(K, θs, rs, vals, u)
 end
 
