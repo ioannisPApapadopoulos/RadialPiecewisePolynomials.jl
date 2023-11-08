@@ -17,6 +17,7 @@ import LazyArrays: Vcat
 import SpecialFunctions: beta
 import HypergeometricFunctions: _₂F₁general2
 import BlockBandedMatrices: _BandedBlockBandedMatrix, AbstractBandedBlockBandedMatrix, subblockbandwidths, blockbandwidths, AbstractBandedBlockBandedLayout, layout_replace_in_print_matrix
+import PiecewiseOrthogonalPolynomials: ArrowheadMatrix
 
 export SVector, Zeros, Ones, Vcat, Derivative, pad, paddeddata, Hcat, RadialCoordinate,
         ContinuousZernikeElementMode, ContinuousZernikeAnnulusElementMode, grid, plotvalues, plot_helper,
@@ -32,7 +33,6 @@ export SVector, Zeros, Ones, Vcat, Derivative, pad, paddeddata, Hcat, RadialCoor
 get_rs(x) = x.r
 get_θs(x) = x.θ
 
-include("arrowhead.jl")
 include("diskelement.jl")
 include("annuluselement.jl")
 include("finitecontinuousmode.jl")

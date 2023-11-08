@@ -2,7 +2,7 @@
 
 julia_version = "1.9.2"
 manifest_format = "2.0"
-project_hash = "b0a1614238239a1868646de0ffb2dae02b05d74b"
+project_hash = "b10bc9e72c19ed7893ed044675b2cb7bad81080d"
 
 [[deps.AbstractFFTs]]
 deps = ["LinearAlgebra"]
@@ -433,6 +433,12 @@ deps = ["Artifacts", "CompilerSupportLibraries_jll", "JLLWrappers", "Libdl", "Pk
 git-tree-sha1 = "13652491f6856acfd2db29360e1bbcd4565d04f1"
 uuid = "efe28fd5-8261-553b-a9e1-b2916fc3738e"
 version = "0.5.5+0"
+
+[[deps.PiecewiseOrthogonalPolynomials]]
+deps = ["ArrayLayouts", "BandedMatrices", "BlockArrays", "BlockBandedMatrices", "ClassicalOrthogonalPolynomials", "ContinuumArrays", "FillArrays", "InfiniteArrays", "InfiniteLinearAlgebra", "LazyArrays", "LazyBandedMatrices", "LinearAlgebra", "MatrixFactorizations", "QuasiArrays"]
+path = "C:\\Users\\john.papad\\.julia\\dev\\PiecewiseOrthogonalPolynomials"
+uuid = "4461d12d-4663-4550-8580-cb764c85e20f"
+version = "0.2.4"
 
 [[deps.Pkg]]
 deps = ["Artifacts", "Dates", "Downloads", "FileWatching", "LibGit2", "Libdl", "Logging", "Markdown", "Printf", "REPL", "Random", "SHA", "Serialization", "TOML", "Tar", "UUIDs", "p7zip_jll"]
