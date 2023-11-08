@@ -213,10 +213,10 @@ function _build_second_block(F::FiniteContinuousZernikeMode{T}, Ms, γs::Abstrac
         end
     end
     if p ≈ 0
-        K == 1 && return [BandedMatrix{T}(0=>dv[j]) for j in 1:bs]
-        return [BandedMatrix{T}(0=>dv[j], 1=>ev[j]) for j in 1:bs]
+        K == 1 && return Tuple([BandedMatrix{T}(0=>dv[j]) for j in 1:bs])
+        return Tuple([BandedMatrix{T}(0=>dv[j], 1=>ev[j]) for j in 1:bs])
     else
-        return [BandedMatrix{T}((0=>dv[j], -1=>ev[j]), (K+1, K)) for j in 1:bs]
+        return Tuple([BandedMatrix{T}((0=>dv[j], -1=>ev[j]), (K+1, K)) for j in 1:bs])
     end
 end
 
@@ -236,9 +236,8 @@ end
 function _arrow_head_matrix(F::FiniteContinuousZernikeMode, Ms, γs::AbstractArray{T}, N::Int, bs::Int, p::T) where T
     A = _build_top_left_block(F,Ms, γs, p)
     B = _build_second_block(F,Ms, γs, bs, p)
-    C = BandedMatrix{T, Matrix{T}, Base.OneTo{Int64}}[]
     D = _build_trailing_bubbles(F,Ms, N, bs, p)
-    Symmetric(ArrowheadMatrix{T}(A, B, C, D))
+    Symmetric(ArrowheadMatrix{T}(A, B, (), D))
 end
 
 # FIXME: Need to make type-safe
