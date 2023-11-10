@@ -2,7 +2,7 @@
 
 julia_version = "1.9.2"
 manifest_format = "2.0"
-project_hash = "b10bc9e72c19ed7893ed044675b2cb7bad81080d"
+project_hash = "863dd8959ec9a5317642bcd85e136a98022956aa"
 
 [[deps.AbstractFFTs]]
 deps = ["LinearAlgebra"]
@@ -510,7 +510,9 @@ version = "0.7.0"
 
 [[deps.SemiclassicalOrthogonalPolynomials]]
 deps = ["ArrayLayouts", "BandedMatrices", "ClassicalOrthogonalPolynomials", "ContinuumArrays", "FillArrays", "HypergeometricFunctions", "InfiniteArrays", "InfiniteLinearAlgebra", "LazyArrays", "LinearAlgebra", "QuasiArrays", "SpecialFunctions"]
-git-tree-sha1 = "7733fc692b791aa9297b40d41761a86d1376857b"
+git-tree-sha1 = "62892bc984afb0980bf398dcb4db1e0380f4aeb7"
+repo-rev = "contiguous"
+repo-url = "https://github.com/TSGut/SemiclassicalOrthogonalPolynomials.jl.git"
 uuid = "291c01f3-23f6-4eb6-aeb0-063a639b53f2"
 version = "0.5.3"
 

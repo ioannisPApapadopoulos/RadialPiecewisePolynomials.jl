@@ -95,12 +95,15 @@ end
 @simplify function *(A::QuasiAdjoint{<:Any,<:ContinuousZernikeElementMode}, B::ContinuousZernikeElementMode)
     T = promote_type(eltype(A), eltype(B))
     @assert A' == B
-    ρ = convert(T, last(B.points))
-
-    X = jacobimatrix(Normalized(Jacobi{T}(1,B.m)))
+    mass_matrix(B)
+end
+function mass_matrix(C::ContinuousZernikeElementMode)
+    T = eltype(C)
+    ρ = convert(T, last(C.points))
+    X = jacobimatrix(Normalized(Jacobi{T}(1,C.m)))
     M = ρ^2*(I-X)/2
-    M = [[T[ρ^2/sqrt(B.m+2)]; Zeros{T}(∞)] M]
-    Vcat([T[ρ^2]; T[ρ^2/sqrt(B.m+2)]; Zeros{T}(∞)]', M)
+    M = [[T[ρ^2/sqrt(C.m+2)]; Zeros{T}(∞)] M]
+    Vcat([T[ρ^2]; T[ρ^2/sqrt(C.m+2)]; Zeros{T}(∞)]', M)
 end
 
 ###
@@ -111,12 +114,6 @@ end
     T = promote_type(eltype(A), eltype(C))
     @assert A' == C
 
-    ρ = convert(T, last(C.points))
-    m = C.m
-
-    L₁₁ = ρ / sqrt(2*one(T)) * (Weighted(Normalized(Jacobi{T}(0,m))) \ Weighted(Normalized(Jacobi{T}(1,m))))
-    L = Hcat(Vcat(ρ*one(T), Zeros{T}(∞)), L₁₁)
-
     # We need to compute the Jacobi matrix multiplier addition due to the
     # variable Helmholtz coefficient λ(r²). We expand λ(r²) in chebyshevt
     # and then use Clenshaw to compute λ(ρ^2*(X-I)/2) where X is the 
@@ -124,10 +121,19 @@ end
     Tn = chebyshevt(C.points[1]..C.points[2])
     u = Tn \ λ.f.(axes(Tn,1))
     X = jacobimatrix(Normalized(Jacobi(0, m)))
-    W = Clenshaw(paddeddata(u), recurrencecoefficients(Tn)..., ρ^2*(X+I)/2, _p0(Tn))
+    Λ = Clenshaw(paddeddata(u), recurrencecoefficients(Tn)..., ρ^2*(X+I)/2, _p0(Tn))
 
-    # TODO fix the excess zeros
-    return ApplyArray(*, L', ApplyArray(*, W, L))
+    assembly_matrix(C, Λ)
+end
+function assembly_matrix(C::ContinuousZernikeElementMode, Λ::AbstractMatrix)
+    T = eltype(C)
+    ρ = convert(T, last(C.points))
+    m = C.m
+
+    R₁₁ = ρ / sqrt(2*one(T)) * (Weighted(Normalized(Jacobi{T}(0,m))) \ Weighted(Normalized(Jacobi{T}(1,m))))
+    R = Hcat(Vcat(ρ*one(T), Zeros{T}(∞)), R₁₁)
+
+    ApplyArray(*, R', ApplyArray(*, Λ, R))
 end
 
 ###
@@ -149,10 +155,15 @@ axes(Z:: GradientContinuousZernikeElementMode) = (Inclusion(last(Z.C.points)*Uni
 end
 
 @simplify function *(A::QuasiAdjoint{<:Any,<:GradientContinuousZernikeElementMode}, B::GradientContinuousZernikeElementMode)
-    T = promote_type(eltype(A), eltype(B))
+    @assert A' == B
+    C = B.C
+    stiffness_matrix(C)
+end
+function stiffness_matrix(C::ContinuousZernikeElementMode)
+    T = eltype(C)
     Z = Zernike{T}(1)
     D = Z \ (Laplacian(axes(Z,1))*Weighted(Z))
-    m = B.C.m
+    m = C.m
 
     Δ = -D.ops[m+1]
     cₘ = π*m*zerniker(m,m,0,0,one(T))^2 # = <∇ Z^(0,1)_{m,m,j},∇ Z^(0,1)_{m,m,j}>_L^2

@@ -1,18 +1,15 @@
-const VIA_JACOBI = false # toggle this to go via _ann2element_via_Jacobi or _ann2element_via_lowering
-
 struct FiniteContinuousZernike{T, N<:Int, P<:AbstractVector} <: Basis{T}
     N::N
     points::P
     Fs::Tuple{Vararg{FiniteContinuousZernikeMode}}
-    via_Jacobi::Bool
 end
 
-function FiniteContinuousZernike{T}(N::Int, points::AbstractVector, Fs::Tuple{Vararg{FiniteContinuousZernikeMode}}; via_Jacobi::Bool) where {T}
+function FiniteContinuousZernike{T}(N::Int, points::AbstractVector, Fs::Tuple{Vararg{FiniteContinuousZernikeMode}}) where {T}
     @assert length(points) > 1 && points == sort(points)
     @assert length(Fs) == 2N-1
-    FiniteContinuousZernike{T, Int, typeof(points)}(N, points, Fs, via_Jacobi)
+    FiniteContinuousZernike{T, Int, typeof(points)}(N, points, Fs)
 end
-FiniteContinuousZernike(N::Int, points::AbstractVector; via_Jacobi::Bool=VIA_JACOBI) = FiniteContinuousZernike{Float64}(N, points, Tuple(_getFs(N, points, via_Jacobi)), via_Jacobi=via_Jacobi)
+FiniteContinuousZernike(N::Int, points::AbstractVector) = FiniteContinuousZernike{Float64}(N, points, Tuple(_getFs(N, points)))
 
 function axes(Z::FiniteContinuousZernike{T}) where T
     first(Z.points) ≈ 0 && return (Inclusion(last(Z.points)*UnitDisk{T}()), blockedrange(Vcat(length(Z.points)-1, Fill(length(Z.points) - 1, Z.N-2))))
@@ -21,40 +18,25 @@ function axes(Z::FiniteContinuousZernike{T}) where T
 end
 ==(P::FiniteContinuousZernike, Q::FiniteContinuousZernike) = P.N == Q.N && P.points == Q.points
 
-function show(io::IO, F::FiniteContinuousZernike)
-    N, points = F.N, F.points
+function show(io::IO, Φ::FiniteContinuousZernike)
+    N, points = Φ.N, Φ.points
     print(io, "FiniteContinuousZernike at degree N=$N and endpoints $points.")
-end
-
-# Matrices for lowering to ZernikeAnnulus(1,1) via
-# the Jacobi matrix. Stable, but probably higher complexity
-# and cannot be used for L2 inner-product of FiniteZernikeBasis
-# and FiniteContinuousZernike
-function _ann2element_via_Jacobi(t::T) where T
-    Q₁₁ = SemiclassicalJacobi{T}.(t, 1, 1, 0:∞)
-    X = jacobimatrix.(Q₁₁)
-
-    L₁₁ = (X .- X .* X)/t^2
-    L₀₁ = (Fill(I, ∞) .- X)/t
-    L₁₀ = X/t
-
-    (L₁₁, L₀₁, L₁₀)
 end
 
 # Matrices for lowering to ZernikeAnnulus(0,0) via
 # direct lowering. Less stable, but probably lower complexity.
-function _ann2element_via_lowering(t::T) where T
+function _ann2element_via_raising(t::T) where T
     # {T} did not change the speed.
     Q₀₀ = SemiclassicalJacobi{T}.(t, 0, 0, 0:∞)
     Q₀₁ = SemiclassicalJacobi{T}.(t, 0, 1, 0:∞)
     Q₁₀ = SemiclassicalJacobi{T}.(t, 1, 0, 0:∞)
     Q₁₁ = SemiclassicalJacobi{T}.(t, 1, 1, 0:∞)
 
-    L₁₁ = (Weighted.(Q₀₀) .\ Weighted.(Q₁₁)) / t^2
-    L₀₁ = (Weighted.(Q₀₀) .\ Weighted.(Q₀₁)) / t
-    L₁₀ = (Weighted.(Q₀₀) .\ Weighted.(Q₁₀)) / t
+    R₁₁ = (Weighted.(Q₀₀) .\ Weighted.(Q₁₁)) / t^2
+    R₀₁ = BroadcastVector{AbstractVector}((Q, P) -> (Weighted(Q) \ Weighted(P))[1:2,1] / t, Q₀₀, Q₀₁)
+    R₁₀ = BroadcastVector{AbstractVector}((Q, P) -> (Weighted(Q) \ Weighted(P))[1:2,1] / t, Q₀₀, Q₁₀)
 
-    (L₁₁, L₀₁, L₁₀)
+    BroadcastVector{AbstractMatrix}((R11, R01, R10)->Hcat(Vcat(R10, Zeros{T}(∞)), Vcat(R01, Zeros{T}(∞)), R11), R₁₁, R₀₁, R₁₀)
 end
 
 function _getMs_ms_js(N::Int)
@@ -64,7 +46,7 @@ function _getMs_ms_js(N::Int)
     (Ms, ms, js)
 end
 
-function _getFs(N::Int, points::AbstractVector{T}, via_Jacobi::Bool) where T
+function _getFs(N::Int, points::AbstractVector{T}) where T
     # Ordered list of Fourier modes (ms, js) and correct length for each Fourier mode Ms.
     same_ρs = false
     Ms, ms, js = _getMs_ms_js(N)
@@ -95,15 +77,9 @@ function _getFs(N::Int, points::AbstractVector{T}, via_Jacobi::Bool) where T
         # Use broadcast notation to compute all the lowering matrices across all
         # intervals and Fourier modes simultaneously.
 
-        if via_Jacobi
-            Ls = _ann2element_via_Jacobi.(ts)
-            cst = [[sum.(SemiclassicalJacobiWeight.(t,1,1,0:ms[end])) for t in ts],
-                    [sum.(SemiclassicalJacobiWeight.(t,2,0,0:ms[end])) for t in ts],
-                    [sum.(SemiclassicalJacobiWeight.(t,0,2,0:ms[end])) for t in ts]]
-        else
-            Ls = _ann2element_via_lowering.(ts)
-            cst = [[sum.(SemiclassicalJacobiWeight.(t,a,a,0:ms[end])) for t in ts] for a in 1:-1:0]
-        end
+
+        Rs = _ann2element_via_raising.(ts)
+        cst = [[sum.(SemiclassicalJacobiWeight.(t,a,a,0:ms[end])) for t in ts] for a in 1:-1:0]
 
         # Use broadcast notation to compute all the derivative matrices across
         # all the intervals and Fourier modes simultaneously
@@ -128,26 +104,23 @@ function _getFs(N::Int, points::AbstractVector{T}, via_Jacobi::Bool) where T
     for (M, m, j) in zip(Ms, ms, js)
         # Extract the lowering and differentiation matrices associated
         # with each Fourier mode and store in the Tuples
-        L₁₁ = NTuple{K+1-κ, AbstractMatrix}([Ls[i][1][m+1] for i in 1:K+1-κ])
-        L₀₁ = NTuple{K+1-κ, AbstractMatrix}([Ls[i][2][m+1] for i in 1:K+1-κ])
-        L₁₀ = NTuple{K+1-κ, AbstractMatrix}([Ls[i][3][m+1] for i in 1:K+1-κ])
-        
+        R = NTuple{K+1-κ, AbstractMatrix}([Rs[i][m+1] for i in 1:K+1-κ])
         D = NTuple{K+1-κ, AbstractMatrix}([Ds[i][m+1] for i in 1:K+1-κ])
 
         normalize_constants = Vector{T}[T[cst[k][i][m+1] for k in 1:lastindex(cst)] for i in 1:K+1-κ]
 
         # Construct the structs for each Fourier mode seperately
-        append!(Fs, [FiniteContinuousZernikeMode(M, points, m, j, L₁₁, L₀₁, L₁₀, D, normalize_constants, via_Jacobi, same_ρs, N)])
+        append!(Fs, [FiniteContinuousZernikeMode(M, points, m, j, R, D, normalize_constants, same_ρs, N)])
     end
     return Fs
 end
 
-_getFs(F::FiniteContinuousZernike{T}) where T = _getFs(F.N, F.points, F.via_Jacobi)
+_getFs(Φ::FiniteContinuousZernike{T}) where T = _getFs(Φ.N, Φ.points)
 
-function ldiv(F::FiniteContinuousZernike{V}, f::AbstractQuasiVector) where V
+function ldiv(Φ::FiniteContinuousZernike{V}, f::AbstractQuasiVector) where V
     @warn "Expanding via FiniteContinuousZernike is ill-conditioned, please use FiniteZernikeBasis."
-    Fs = F.Fs
-    [F \ f.f.(axes(F, 1)) for F in Fs]
+    Fs = Φ.Fs
+    [Φ \ f.f.(axes(Φ, 1)) for Φ in Fs]
 end
 
 ###
@@ -157,67 +130,120 @@ end
 @simplify function *(A::QuasiAdjoint{<:Any,<:FiniteContinuousZernike}, B::FiniteContinuousZernike)
     @assert A' == B
     Fs = B.Fs
-    [F' * F for F in Fs]
+    mass_matrix.(Fs)
 end
 
 ###
 # Weighted L2 inner products
-# Gives out list of weighted mass matrices of correct size
+# Gives out list of the assembly matrices of correct size
 ###
 @simplify function *(A::QuasiAdjoint{<:Any,<:FiniteContinuousZernike}, λB::BroadcastQuasiMatrix{<:Any, typeof(*), <:Tuple{BroadcastQuasiVector, FiniteContinuousZernike}})
+    T = promote_type(eltype(A), eltype(λB))
     λ, B = λB.args
     @assert A' == B
     Fs = B.Fs
-    xs = [axes(F,1) for F in Fs]
-    [F' * (λ.f.(x) .* F) for (F, x) in zip(Fs, xs)]
+
+    K, points = lastindex(B.points)-1, B.points
+    ρs = []
+    for j = 1:K
+        append!(ρs, [points[j] / points[j+1]])
+    end
+    ts = inv.(one(T) .- ρs.^2)
+
+    Λs = []
+    for j in 1:K
+        Tn = chebyshevt(points[j]..points[j+1])
+        u = Tn \ λ.f.(axes(Tn,1))
+        if points[j] ≈ 0
+            X = jacobimatrix.(Normalized.(Jacobi.(0, 0:B.N-1)))
+            append!(Λs, [BroadcastArray{AbstractMatrix}(Y->Clenshaw(paddeddata(u), recurrencecoefficients(Tn)..., points[j+1]^2/2 * (Y+I), _p0(Tn)), X)])
+        else
+            X = jacobimatrix.(SemiclassicalJacobi.(ts[j], 0, 0, 0:B.N-1))
+            append!(Λs, [BroadcastArray{AbstractMatrix}(Y->Clenshaw(paddeddata(u), recurrencecoefficients(Tn)..., points[j+1]^2 * (I-Y/ts[j]), _p0(Tn)), X)])
+        end
+    end
+
+    # Rearrange the list to match with Fs
+    _, ms, _ = _getMs_ms_js(B.N)
+    Λs = [[Λs[k][m+1] for k in 1:lastindex(Λs)] for m in ms]
+
+    [assembly_matrix(F, Λ) for (F, Λ) in zip(Fs, Λs)]
 end
 
+function piecewise_constant_assembly_matrix(Φ::FiniteContinuousZernike, λ::Function)
+    Fs = Φ.Fs
+    K, points = lastindex(Φ.points)-1, Φ.points
+    λs = λ.((points[1:end-1] + points[2:end] ) / 2)
+    Λ = [Diagonal(Fill(λs[k],∞)) for k in 1:K]
+    [assembly_matrix(F, Λ) for F in Fs]
+end
 
 ###
 # Gradient for constructing weak Laplacian.
 ###
 
 struct GradientFiniteContinuousZernike{T}<:Basis{T}
-    F::FiniteContinuousZernike{T}
+    Φ::FiniteContinuousZernike{T}
 end
 
 # GradientFiniteContinuousZernike{T}(N::Int, points::AbstractVector) where {T} =  GradientFiniteContinuousZernike{T,Int, typeof(points)}(N, points)
 # GradientFiniteContinuousZernike(N::Int, points::AbstractVector) =  GradientFiniteContinuousZernike{Float64}(N, points)
 
-axes(Z:: GradientFiniteContinuousZernike) = (Inclusion(last(Z.F.points)*UnitDisk{eltype(Z)}()), oneto(Z.F.N*(length(Z.F.points)-1)-(length(Z.F.points)-2)))
-==(P::GradientFiniteContinuousZernike, Q::GradientFiniteContinuousZernike) = P.F.points == Q.F.points
+axes(Z:: GradientFiniteContinuousZernike) = (Inclusion(last(Z.Φ.points)*UnitDisk{eltype(Z)}()), oneto(Z.Φ.N*(length(Z.Φ.points)-1)-(length(Z.Φ.points)-2)))
+==(P::GradientFiniteContinuousZernike, Q::GradientFiniteContinuousZernike) = P.Φ.points == Q.Φ.points
 
-@simplify function *(D::Derivative, F::FiniteContinuousZernike)
-    GradientFiniteContinuousZernike(F)
+@simplify function *(D::Derivative, Φ::FiniteContinuousZernike)
+    GradientFiniteContinuousZernike(Φ)
 end
 
 @simplify function *(A::QuasiAdjoint{<:Any,<:GradientFiniteContinuousZernike}, B::GradientFiniteContinuousZernike)
     T = promote_type(eltype(A), eltype(B))
     @assert A' == B
-    # points = T.(B.F.points);
-    # N = B.F.N;
-    Fs = B.F.Fs
-    ∇ = Derivative(axes(Fs[1],1))
-    [(∇*F)' * (∇*F) for F in Fs]
+    # points = T.(B.Φ.points);
+    # N = B.Φ.N;
+    Fs = B.Φ.Fs
+    stiffness_matrix.(Fs)
 end
 
-# function zero_dirichlet_bcs!(F::FiniteContinuousZernike{T}, Δ::AbstractVector{<:LinearAlgebra.Symmetric{T,<:ArrowheadMatrix{T}}}) where T
-#     @assert length(Δ) == 2*F.N-1
-#     Fs = _getFs(F.N, F.points)
+# function zero_dirichlet_bcs!(Φ::FiniteContinuousZernike{T}, Δ::AbstractVector{<:LinearAlgebra.Symmetric{T,<:ArrowheadMatrix{T}}}) where T
+#     @assert length(Δ) == 2*Φ.N-1
+#     Fs = _getFs(Φ.N, Φ.points)
 #     zero_dirichlet_bcs!.(Fs, Δ)
 # end
 
-function zero_dirichlet_bcs!(F::FiniteContinuousZernike{T}, Δ::AbstractVector{<:AbstractMatrix}) where T
-    @assert length(Δ) == 2*F.N-1
+function zero_dirichlet_bcs!(Φ::FiniteContinuousZernike{T}, Δ::AbstractVector{<:AbstractMatrix}) where T
+    @assert length(Δ) == 2*Φ.N-1
     # @assert Δ[1] isa LinearAlgebra.Symmetric{T, <:ArrowheadMatrix{T}}
-    Fs = F.Fs #_getFs(F.N, F.points)
+    Fs = Φ.Fs #_getFs(Φ.N, Φ.points)
     zero_dirichlet_bcs!.(Fs, Δ)
 end
 
-function zero_dirichlet_bcs!(F::FiniteContinuousZernike{T}, Mf::AbstractVector{<:PseudoBlockVector}) where T
-    @assert length(Mf) == 2*F.N-1
-    Fs = F.Fs #_getFs(F.N, F.points)
+function zero_dirichlet_bcs!(Φ::FiniteContinuousZernike{T}, Mf::AbstractVector{<:PseudoBlockVector}) where T
+    @assert length(Mf) == 2*Φ.N-1
+    Fs = Φ.Fs #_getFs(Φ.N, Φ.points)
     zero_dirichlet_bcs!.(Fs, Mf)
+end
+
+function zero_dirichlet_bcs!(points::AbstractVector{T}, A::Matrix) where T
+    K = length(points)-1
+    if first(points) > 0
+        A[1,:] .= zero(T); A[:,1] .= zero(T)
+        A[K+1, :] .= zero(T); A[:, K+1] .= zero(T)
+        A[1,1] = one(T); A[K+1, K+1] = one(T)
+    else
+        A[K,:] .= zero(T); A[:,K] .= zero(T)
+        A[K,K] = one(T)
+    end
+end
+
+function zero_dirichlet_bcs!(points::AbstractVector{T}, Mf::PseudoBlockVector) where T
+    K = length(points)-1
+    if !(first(points) ≈  0)
+        Mf[1] = zero(T)
+        Mf[K+1] = zero(T)
+    else
+        Mf[K] = zero(T)
+    end
 end
 
 ###
@@ -226,10 +252,12 @@ end
 # This helper function takes the list of coefficient values from ldiv and converts them into 
 # a 3-tensor of degree × Fourier mode × element. Us is the hat/bubble coeffiecients
 # and Ũs are the corresponding ZernikeAnnulus(ρ,1,1) coefficients.
-function _bubble2disk_or_ann_all_modes(F::FiniteContinuousZernike, us::AbstractVector)
-    T = eltype(F)
-    points = T.(F.points); K = length(points)-1
-    N = F.N;
+function _bubble2disk_or_ann_all_modes(Φ::FiniteContinuousZernike, us::AbstractVector)
+    T = eltype(Φ)
+    points = T.(Φ.points); K = length(points)-1
+    N = Int((length(us)+1)/2)
+    @assert N ≤ Φ.N
+
     Ms, ms, _ = _getMs_ms_js(N)
 
     Ñ = isodd(N) ? N : N+1
@@ -254,7 +282,7 @@ function _bubble2disk_or_ann_all_modes(F::FiniteContinuousZernike, us::AbstractV
     end
 
     Ũs = zeros(T, (Ñ+1)÷2,2Ñ-1,K)
-    Fs = F.Fs #_getFs(N, points)
+    Fs = Φ.Fs[1:length(us)] #_getFs(N, points)
 
     for k in 1:K
         if k == 1 && first(points) ≈ 0
@@ -272,12 +300,12 @@ function _bubble2disk_or_ann_all_modes(F::FiniteContinuousZernike, us::AbstractV
 end
 
 
-function finite_plotvalues(F::FiniteContinuousZernike, us::AbstractVector; N=0, K=0)
-    T = eltype(F)
-    _, Ũs = _bubble2disk_or_ann_all_modes(F, us)
-    points = T.(F.points)
-    K = K==0 ? length(F.points)-1 : K
-    N = N == 0 ? F.N : N
+function finite_plotvalues(Φ::FiniteContinuousZernike, us::AbstractVector; N=0, K=0)
+    T = eltype(Φ)
+    _, Ũs = _bubble2disk_or_ann_all_modes(Φ, us)
+    points = T.(Φ.points)
+    K = K==0 ? length(Φ.points)-1 : K
+    N = N == 0 ? Φ.N : N
     θs, rs, vals = [], [], []
     for k in 1:K
         if k == 1 && first(points) ≈ 0
@@ -289,7 +317,7 @@ function finite_plotvalues(F::FiniteContinuousZernike, us::AbstractVector; N=0, 
         else
             α, β = points[k], points[k+1]
             ρ = α / β
-            w_a = F.via_Jacobi ? one(T) : zero(T)
+            w_a = zero(T)
             Z = ZernikeAnnulus{T}(ρ, w_a, w_a)
             # Scale the grid
             g = scalegrid(AnnuliOrthogonalPolynomials.grid(Z, Block(N)), α, β)
@@ -313,13 +341,13 @@ function _inf_error(K::Int, θs::AbstractVector, rs::AbstractVector, vals::Abstr
     vals_, norm((norm.(vals_, Inf)), Inf)
 end
 
-function inf_error(F::FiniteContinuousZernike{T}, θs::AbstractVector, rs::AbstractVector, vals::AbstractVector, u::Function;K=0) where T
-    K = K==0 ? lastindex(F.points)-1 : K
+function inf_error(Φ::FiniteContinuousZernike{T}, θs::AbstractVector, rs::AbstractVector, vals::AbstractVector, u::Function;K=0) where T
+    K = K==0 ? lastindex(Φ.points)-1 : K
     _inf_error(K, θs, rs, vals, u)
 end
 
-function modaltrav_2_list(F::FiniteContinuousZernike{T}, u::AbstractArray{Vector{T}}) where T
-    N, points = F.N, F.points
+function modaltrav_2_list(Φ::FiniteContinuousZernike{T}, u::AbstractArray{Vector{T}}) where T
+    N, points = Φ.N, Φ.points
     K = length(points) - 1
     Ns, _, _ = _getMs_ms_js(N)
 
@@ -335,8 +363,8 @@ function modaltrav_2_list(F::FiniteContinuousZernike{T}, u::AbstractArray{Vector
     return cs
 end
 
-function adi_2_modaltrav(F::FiniteContinuousZernike{T}, wQ::Weighted{<:Any, <:Jacobi}, Us::AbstractArray, z::AbstractArray{T}) where T
-    N, points = F.N, F.points
+function adi_2_modaltrav(Φ::FiniteContinuousZernike{T}, wQ::Weighted{<:Any, <:Jacobi}, Us::AbstractArray, z::AbstractArray{T}) where T
+    N, points = Φ.N, Φ.points
     K = length(points) - 1
     Ns, _, _ = _getMs_ms_js(N)
 
@@ -354,8 +382,8 @@ function adi_2_modaltrav(F::FiniteContinuousZernike{T}, wQ::Weighted{<:Any, <:Ja
     return Y
 end
 
-function adi_2_list(F::FiniteContinuousZernike{T}, wQ::Weighted{<:Any, <:Jacobi}, Us::AbstractArray, z::AbstractArray{T}) where T
-    N, points = F.N, F.points
+function adi_2_list(Φ::FiniteContinuousZernike{T}, wQ::Weighted{<:Any, <:Jacobi}, Us::AbstractArray, z::AbstractArray{T}) where T
+    N, points = Φ.N, Φ.points
     K = length(points) - 1
     Ns, _, _ = _getMs_ms_js(N)
 

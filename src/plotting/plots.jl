@@ -1,4 +1,4 @@
-using PyPlot, DelimitedFiles, LaTeXStrings
+using PyPlot, Plots, DelimitedFiles, LaTeXStrings
 
 #######
 ### Helper plot functions
@@ -39,7 +39,7 @@ function _plot(K::Int, θs::AbstractVector, rs::AbstractVector, vals::AbstractVe
 end
 
 function plot(F::FiniteContinuousZernike{T}, θs::AbstractVector, rs::AbstractVector, vals::AbstractVector;ρ::T=0.0, ttl=[], vminmax=[],K=0) where T
-    K = K ==0 ? lastindex(Z.points)-1 : K
+    K = K ==0 ? lastindex(F.points)-1 : K
     _plot(K, θs, rs, vals, ρ=ρ, ttl=ttl, vminmax=vminmax)
 end
 
@@ -76,4 +76,27 @@ function cylinder_plot_save(xy::Matrix{<:RadialCoordinate}, z::AbstractArray, va
     writedlm(path*"theta.log", θ)
     
     writedlm(path*"vals.log", reshape(vals, length(r), length(θ), length(z))) 
+end
+
+## slice plot
+function slice_plot(iθ::Int, θs, rs, vals; ttl=L"$u(x,y)$", cell_edges=1)
+    rrs = reverse.(rs)
+    rvals = [reverse(vals[j][:,iθ]) for j in 1:lastindex(vals)]
+    θ = round(θs[1][iθ], digits=4)
+    p = Plots.plot(rrs,
+        rvals,
+        # label=["Disk cell" "Annulus cell"],
+        linewidth=2,
+        ylabel=ttl,
+        xlabel=L"$r$",
+        title=L"\theta = %$θ",
+        gridlinewidth = 2,
+        tickfontsize=10, ytickfontsize=10,xlabelfontsize=15,ylabelfontsize=15,
+        legendfontsize=10, titlefontsize=20,
+        legend=:none)
+
+    if cell_edges == 1
+        vline!(points, color=:black, linewidth=0.8, label="", linestyle=:dash)
+    end
+    Plots.display(p)
 end
