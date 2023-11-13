@@ -248,7 +248,7 @@ function _build_trailing_bubbles(F::FiniteContinuousZernikeMode{T}, Ψ::FiniteZe
     else
         # Mn = [Ms[i][3:N, 2:N] for i in 1:K]
         # Mn = [[i=>view(Ms[k], band(i))[3:N-j] for (i, j) in zip(-1:1, [1,0,0])] for k in 1:K]
-        [[-1=>view(Ms[k], band(-2))[2:N-2], 0=>view(Ms[k], band(-1))[2:N-1], 1=>view(Ms[k], band(0))[3:N]] for k in 1:K]
+        Mn = [[-1=>view(Ms[k], band(-2))[2:N-2], 0=>view(Ms[k], band(-1))[2:N-1], 1=>view(Ms[k], band(0))[3:N]] for k in 1:K]
     end
     # return [BandedMatrix{T}(-1=>view(M, band(-1)), 0=>view(M, band(0)), 1=>view(M, band(1))) for M in Mn]
     return [BandedMatrix{T}(M...) for M in Mn]

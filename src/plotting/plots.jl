@@ -79,7 +79,7 @@ function cylinder_plot_save(xy::Matrix{<:RadialCoordinate}, z::AbstractArray, va
 end
 
 ## slice plot
-function slice_plot(iθ::Int, θs, rs, vals; ttl=L"$u(x,y)$", cell_edges=1)
+function slice_plot(iθ::Int, θs, rs, vals, points; ttl=L"$u(x,y)$", cell_edges=1)
     rrs = reverse.(rs)
     rvals = [reverse(vals[j][:,iθ]) for j in 1:lastindex(vals)]
     θ = round(θs[1][iθ], digits=4)
