@@ -27,7 +27,6 @@ export SVector, Zeros, Ones, Vcat, Derivative, pad, paddeddata, Hcat, RadialCoor
         FiniteContinuousZernikeMode, FiniteContinuousZernike, inf_error,
         FiniteZernikeBasis, ZernikeBasisMode, FiniteZernikeBasisMode,
         ArrowheadMatrix,
-        list_2_modaltrav, modaltrav_2_list, adi_2_modaltrav, adi_2_list,
         get_rs, get_θs, getNs,
         mass_matrix, assembly_matrix, stiffness_matrix, gramm_matrix, piecewise_constant_assembly_matrix
 
