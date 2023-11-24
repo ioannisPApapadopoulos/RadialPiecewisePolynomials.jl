@@ -3,27 +3,24 @@ struct FiniteContinuousZernikeMode{T} <: Basis{T}
     points::AbstractVector{T}
     m::Int
     j::Int
-    L₁₁::Tuple{Vararg{AbstractMatrix{T}}}
-    L₀₁::Tuple{Vararg{AbstractMatrix{T}}}
-    L₁₀::Tuple{Vararg{AbstractMatrix{T}}}
+    R::Tuple{Vararg{AbstractMatrix{T}}}
     D::Tuple{Vararg{AbstractMatrix{T}}}
     normalize_constants::AbstractVector{<:AbstractVector{<:T}}
-    via_Jacobi::Bool
     same_ρs::Bool
     b::Int # Should remove once adaptive expansion has been figured out.
 end
 
-function FiniteContinuousZernikeMode(N::Int, points::AbstractVector{T}, m::Int, j::Int, L₁₁, L₀₁, L₁₀, D, normalize_constants::AbstractVector{<:AbstractVector{<:T}}; via_Jacobi, same_ρs::Bool) where T
+function FiniteContinuousZernikeMode(N::Int, points::AbstractVector{T}, m::Int, j::Int, R, D, normalize_constants::AbstractVector{<:AbstractVector{<:T}}; same_ρs::Bool) where T
     @assert points == sort(points)
     @assert m ≥ 0
     @assert m == 0 ? j == 1 : 0 ≤ j ≤ 1
     K = first(points) ≈ 0 ? length(points)-2 : length(points) - 1
-    @assert length(L₁₁) == length(L₀₁) == length(L₁₀) == length(D) == (same_ρs ? 1 : K)
+    @assert length(R) == length(D) == (same_ρs ? 1 : K)
     # @assert length(normalize_constants) ≥ 2
-    FiniteContinuousZernikeMode{T}(N, points, m, j, L₁₁, L₀₁, L₁₀, D, normalize_constants, via_Jacobi, same_ρs, m+2N)
+    FiniteContinuousZernikeMode{T}(N, points, m, j, R, D, normalize_constants, same_ρs, m+2N)
 end
 
-function FiniteContinuousZernikeMode(N::Int, points::AbstractVector{T}, m::Int, j::Int; via_Jacobi::Bool=false, same_ρs::Bool=false) where {T}
+function FiniteContinuousZernikeMode(N::Int, points::AbstractVector{T}, m::Int, j::Int; same_ρs::Bool=false) where {T}
     K = length(points)-1
     κ = first(points[1]) ≈ 0 ? 2 : 1
     ρs = []
@@ -33,26 +30,15 @@ function FiniteContinuousZernikeMode(N::Int, points::AbstractVector{T}, m::Int, 
     end
 
     ts = inv.(one(T) .- ρs.^2)
-    if via_Jacobi
-        Ls = _ann2element_via_Jacobi.(ts, m)
-        normalize_constants = [[_sum_semiclassicaljacobiweight(t, 1, 1, m), _sum_semiclassicaljacobiweight(t, 2, 0, m), _sum_semiclassicaljacobiweight(t, 0, 2, m)] for t in ts]
-    else
-        Ls = _ann2element_via_lowering.(ts, m)
-        normalize_constants = [[_sum_semiclassicaljacobiweight(t, a, a, m) for a in 1:-1:0] for t in ts]
-    end
-    L₁₁ = NTuple{K+1-κ, AbstractMatrix}(first.(Ls))
-    L₀₁ = NTuple{K+1-κ, AbstractMatrix}([Ls[k][2] for k in 1:K+1-κ])
-    L₁₀ = NTuple{K+1-κ, AbstractMatrix}(last.(Ls))
+    R = NTuple{K+1-κ,AbstractMatrix}(_ann2element_via_raising.(ts, m))
+    normalize_constants = [[_sum_semiclassicaljacobiweight(t, a, a, m) for a in 1:-1:0] for t in ts]
 
     Z = ZernikeAnnulus{T}.(ρs,1,1)
     D = (Z .\ (Laplacian.(axes.(Z,1)).*Weighted.(Z)))
     D = NTuple{K+1-κ, AbstractMatrix}([Ds.ops[m+1] for Ds in D])
 
-    FiniteContinuousZernikeMode(N, points, m, j, L₁₁, L₀₁, L₁₀, D, normalize_constants, via_Jacobi=via_Jacobi, same_ρs=same_ρs)
+    FiniteContinuousZernikeMode(N, points, m, j, R, D, normalize_constants, same_ρs=same_ρs)
 end
-
-# FiniteContinuousZernikeMode(points::AbstractVector, m::Int, j::Int, L₁₁, L₀₁, L₁₀, D, b::Int) = FiniteContinuousZernikeMode{Float64}(points, m, j, L₁₁, L₀₁, L₁₀, D, b)
-# FiniteContinuousZernikeMode(points::AbstractVector, m::Int, j::Int, L₁₁, L₀₁, L₁₀, D) = FiniteContinuousZernikeMode{Float64}(points, m, j, L₁₁, L₀₁, L₁₀, D, m+2N)
 
 function axes(Z::FiniteContinuousZernikeMode{T}) where T
     first(Z.points) ≈ 0 && return (Inclusion(last(Z.points)*UnitDisk{T}()), blockedrange(Vcat(length(Z.points)-1, Fill(length(Z.points) - 1, Z.N-2))))
@@ -66,21 +52,21 @@ function show(io::IO, F::FiniteContinuousZernikeMode)
     print(io, "FiniteContinuousZernikeMode: N=$N, points=$points, m=$m, j=$j.")
 end
 
-function _getCs(points::AbstractVector{T}, m::Int, j::Int, b::Int, L₁₁, L₀₁, L₁₀, D, normalize_constants, via_Jacobi::Bool, same_ρs::Bool) where T
+function _getCs(points::AbstractVector{T}, m::Int, j::Int, b::Int, R, D, normalize_constants, same_ρs::Bool) where T
     K = length(points)-1
     if same_ρs
-        first(points) > 0 && return [ContinuousZernikeAnnulusElementMode([points[k]; points[k+1]], m, j, L₁₁[1], L₀₁[1], L₁₀[1], D[1], normalize_constants[1], via_Jacobi, b) for k in 1:K]
-        return append!(Any[ContinuousZernikeElementMode([points[1]; points[2]], m, j)], [ContinuousZernikeAnnulusElementMode([points[k]; points[k+1]], m, j, L₁₁[1], L₀₁[1], L₁₀[1], D[1], normalize_constants[1], via_Jacobi, b) for k in 2:K])
+        first(points) > 0 && return [ContinuousZernikeAnnulusElementMode([points[k]; points[k+1]], m, j, R[1], D[1], normalize_constants[1],  b) for k in 1:K]
+        return append!(Any[ContinuousZernikeElementMode([points[1]; points[2]], m, j)], [ContinuousZernikeAnnulusElementMode([points[k]; points[k+1]], m, j, R[1], D[1], normalize_constants[1], b) for k in 2:K])
     else
-        first(points) > 0 && return [ContinuousZernikeAnnulusElementMode([points[k]; points[k+1]], m, j, L₁₁[k], L₀₁[k], L₁₀[k], D[k], normalize_constants[k], via_Jacobi, b) for k in 1:K]
-        return append!(Any[ContinuousZernikeElementMode([points[1]; points[2]], m, j)], [ContinuousZernikeAnnulusElementMode([points[k]; points[k+1]], m, j, L₁₁[k-1], L₀₁[k-1], L₁₀[k-1], D[k-1], normalize_constants[k-1], via_Jacobi, b) for k in 2:K])
+        first(points) > 0 && return [ContinuousZernikeAnnulusElementMode([points[k]; points[k+1]], m, j, R[k], D[k], normalize_constants[k], b) for k in 1:K]
+        return append!(Any[ContinuousZernikeElementMode([points[1]; points[2]], m, j)], [ContinuousZernikeAnnulusElementMode([points[k]; points[k+1]], m, j, R[k-1], D[k-1], normalize_constants[k-1], b) for k in 2:K])
     end
 end
 
 function _getCs(F::FiniteContinuousZernikeMode)
-    points, m, j, b, via_Jacobi = F.points, F.m, F.j, F.b, F.via_Jacobi
-    L₁₁, L₀₁, L₁₀, D, normalize_constants, same_ρs = F.L₁₁, F.L₀₁, F.L₁₀, F.D, F.normalize_constants, F.same_ρs
-    _getCs(points, m, j, b, L₁₁, L₀₁, L₁₀, D, normalize_constants, via_Jacobi, same_ρs)
+    points, m, j, b = F.points, F.m, F.j, F.b
+    R, D, normalize_constants, same_ρs = F.R, F.D, F.normalize_constants, F.same_ρs
+    _getCs(points, m, j, b, R, D, normalize_constants, same_ρs)
 end
 
 function _getγs(points::AbstractArray{T}, m::Int) where T
@@ -225,12 +211,15 @@ function _build_trailing_bubbles(F::FiniteContinuousZernikeMode{T}, Ms, N::Int, 
     K = length(Ms)
     if p ≈ 0
         # Mn = vcat([Ms[1][2:N-1,2:N-1]], [Ms[i][3:N, 3:N] for i in 2:K])
-        Mn = vcat([Ms[1][2:N-1,2:N-1]], [reshape(view(Ms[i],3:N, 3:N)[:], N-2, N-2) for i in 2:K])
+        # Mn = vcat([Ms[1][2:N-1,2:N-1]], [reshape(view(Ms[i],3:N, 3:N)[:], N-2, N-2) for i in 2:K])
+        Mn = vcat([[i=>view(Ms[1], band(i))[2:N-1-i] for i in 0:bs]], [[i=>view(Ms[k], band(i))[3:N-i] for i in 0:bs] for k in 2:K])
     else
         # Mn = [Ms[i][3:N, 3:N] for i in 1:K]
-        Mn = [reshape(view(Ms[i],3:N, 3:N)[:], N-2, N-2) for i in 1:K]
+        # Mn = [reshape(view(Ms[i],3:N, 3:N)[:], N-2, N-2) for i in 1:K]
+        Mn = [[i=>view(Ms[k], band(i))[3:N-i] for i in 0:bs] for k in 1:K]
     end
-    return [Symmetric(BandedMatrix{T}([i=>view(M, band(i))[:] for i in 0:bs]...)) for M in Mn]
+    # return [Symmetric(BandedMatrix{T}([i=>view(M, band(i))[:] for i in 0:bs]...)) for M in Mn]
+    return [Symmetric(BandedMatrix{T}(M...)) for M in Mn]
 end
 
 function _arrow_head_matrix(F::FiniteContinuousZernikeMode, Ms, γs::AbstractArray{T}, N::Int, bs::Int, p::T) where T
@@ -240,36 +229,31 @@ function _arrow_head_matrix(F::FiniteContinuousZernikeMode, Ms, γs::AbstractArr
     Symmetric(ArrowheadMatrix{T}(A, B, (), D))
 end
 
-# FIXME: Need to make type-safe
-@simplify function *(A::QuasiAdjoint{<:Any,<:FiniteContinuousZernikeMode}, B::FiniteContinuousZernikeMode)
-    # T = promote_type(eltype(A), eltype(B))
-    @assert A' == B
 
+@simplify function *(A::QuasiAdjoint{<:Any,<:FiniteContinuousZernikeMode}, B::FiniteContinuousZernikeMode)
+    @assert A' == B
+    mass_matrix(B)
+end
+
+function mass_matrix(B::FiniteContinuousZernikeMode)
     Cs = _getCs(B)
 
     if B.same_ρs
         if first(B.points) ≈ 0
-            Md = Cs[1]' * Cs[1]
-            M = Cs[2]' * Cs[2]
+            Md = mass_matrix(Cs[1])
+            M = mass_matrix(Cs[2])
             Ms = append!(Any[Md], [ApplyArray(*,Diagonal(Fill((B.points[k]/B.points[3])^2 ,∞)),M) for k = 3:length(B.points)])
         else
-            M = Cs[1]' * Cs[1]
+            M = mass_matrix(Cs[1])
             Ms = [ApplyArray(*,Diagonal(Fill((B.points[k]/B.points[2])^2 ,∞)),M) for k = 2:length(B.points)]
         end
     else
-        Ms = [C' * C for C in Cs]
+        Ms = mass_matrix.(Cs)
     end
 
     γs = _getγs(B)
 
-    # M = _arrow_head_matrix(B, Ms, γs, B.N, 2, first(B.points))
-    if B.N < 4
-        return _arrow_head_matrix(B, Ms, γs, B.N, 1, first(B.points))
-        # return M[Block.(1:B.N-1), Block.(1:B.N-1)]
-    else
-        return _arrow_head_matrix(B, Ms, γs, B.N, 2, first(B.points))
-        # return M
-    end
+    B.N < 4 ? _arrow_head_matrix(B, Ms, γs, B.N, 1, first(B.points)) : _arrow_head_matrix(B, Ms, γs, B.N, 2, first(B.points))
 end
 
 ###
@@ -278,22 +262,45 @@ end
 @simplify function *(A::QuasiAdjoint{<:Any,<:FiniteContinuousZernikeMode}, B::BroadcastQuasiMatrix{<:Any, typeof(*), <:Tuple{BroadcastQuasiVector, FiniteContinuousZernikeMode}})
     λ, F = B.args
     T = promote_type(eltype(A), eltype(F))
-    N = F.N
     @assert A' == F
 
+    K, points = lastindex(F.points)-1, F.points
+    ρs = []
+    for j = 1:K
+        append!(ρs, [points[j] / points[j+1]])
+    end
+    ts = inv.(one(T) .- ρs.^2)
+
+    Λs = AbstractMatrix{T}[]
+    for j in 1:K
+        Tn = chebyshevt(points[j]..points[j+1])
+        u = Tn \ λ.f.(axes(Tn,1))
+        if points[j] ≈ 0
+            X = jacobimatrix(Normalized(Jacobi(0, F.m)))
+            append!(Λs, [Clenshaw(paddeddata(u), recurrencecoefficients(Tn)..., points[j+1]^2*(X+I)/2, _p0(Tn))])
+        else
+            X = jacobimatrix(SemiclassicalJacobi(ts[j], 0, 0, F.m))
+            append!(Λs, [Clenshaw(paddeddata(u), recurrencecoefficients(Tn)..., points[j+1]^2*(I-X/ts[j]), _p0(Tn))])
+        end
+    end
+
+    assembly_matrix(F, Λs)
+end
+function assembly_matrix(F::FiniteContinuousZernikeMode, Λs::Vector{<:AbstractMatrix})
+    T = eltype(F)
     Cs = _getCs(F)
-    xs = [axes(C,1) for C in Cs]
-    Ms = [C' * (λ.f.(x) .* C) for (C, x) in zip(Cs, xs)]
+    Ms = [assembly_matrix(C, Λ) for (C, Λ) in zip(Cs, Λs)]
 
     # figure out necessary bandwidth
     # bs for number of bubbles
+    N = F.N
     if first(F.points) ≈ 0
         bs = min(N-2, maximum(vcat([last(findall(x->abs(x) > 10*eps(T), Ms[1][1:N+3,1]))],[last(colsupport(view(Ms[i], :, 1)[:]))-2 for i in 2:lastindex(Ms)])))
     else
         bs = min(N-2, maximum([last(colsupport(view(Ms[i], :, 1)[:]))-2 for i in 1:lastindex(Ms)]))
     end
     γs = _getγs(F)
-    return _arrow_head_matrix(F, Ms, γs, N, bs, first(F.points))
+    _arrow_head_matrix(F, Ms, γs, N, bs, first(F.points))
 end
 
 ###
@@ -315,24 +322,24 @@ end
 
 @simplify function *(A::QuasiAdjoint{<:Any,<:GradientFiniteContinuousZernikeAnnulusMode}, B::GradientFiniteContinuousZernikeAnnulusMode)
     @assert A' == B
-    F = B.F
+    stiffness_matrix(B.F)
+end
+function stiffness_matrix(F::FiniteContinuousZernikeMode)
+
     N = F.N
     Cs = _getCs(F)
 
-    xs = [axes(C,1) for C in Cs]
-    Ds = [Derivative(x) for x in xs]
-
     if F.same_ρs
         if first(F.points) ≈ 0
-            Δ = (Ds[2]*Cs[2])' * (Ds[2]*Cs[2])
+            Δ = stiffness_matrix(Cs[2])
             Δs = [Δ for i in 1:length(F.points)-2]
-            Δs = append!(Any[(Ds[1]*Cs[1])' * (Ds[1]*Cs[1])], Δs)
+            Δs = append!(Any[stiffness_matrix(Cs[1])], Δs)
         else
-            Δ = (Ds[1]*Cs[1])' * (Ds[1]*Cs[1])
+            Δ = stiffness_matrix(Cs[1])
             Δs = [Δ for i in 1:length(F.points)-1]
         end
     else
-        Δs = [(D*C)' * (D*C) for (C, D) in zip(Cs, Ds)]
+        Δs = stiffness_matrix.(Cs)
     end
 
     γs = _getγs(F)

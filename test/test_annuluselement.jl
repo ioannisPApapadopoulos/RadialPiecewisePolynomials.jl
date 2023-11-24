@@ -15,14 +15,12 @@ import RadialPiecewisePolynomials: ModalTrav, Fill, ApplyArray
         @test C.points == [0.5; 1.0]
         @test C.m == 0
         @test C.j == 1
-        @test C.via_Jacobi == false
 
-        B = ContinuousZernikeAnnulusElementMode([0.1; 0.3], 3, 0, true)
+        B = ContinuousZernikeAnnulusElementMode([0.1; 0.3], 3, 0)
         @test B isa ContinuousZernikeAnnulusElementMode
         @test B.points == [0.1; 0.3]
         @test B.m == 3
         @test B.j == 0
-        @test B.via_Jacobi == true
     end
 
     @testset "evaluation" begin
@@ -67,35 +65,33 @@ import RadialPiecewisePolynomials: ModalTrav, Fill, ApplyArray
     end
 
     @testset "mass matrix" begin
-        for via_Jacobi in [false, true]
-            Memoization.empty_all_caches!()
-            # Test m = 0
-            ρ = 0.2
+        Memoization.empty_all_caches!()
+        # Test m = 0
+        ρ = 0.2
 
-            C = ContinuousZernikeAnnulusElementMode([ρ; 1], 0, 1, via_Jacobi)
-            fc = C \ f0.(axes(C,1))
-            M = C' * C
-            # ∫_0^2π ∫_ρ^1 exp(-r^2)^2 r dr dθ.
-            N = 100
-            @test fc[1:N]' * reshape(view(M, 1:N, 1:N)[:], N, N) * fc[1:N] ≈  π/2 * (exp(-2*0.2^2) - exp(-2))
+        C = ContinuousZernikeAnnulusElementMode([ρ; 1], 0, 1)
+        fc = C \ f0.(axes(C,1))
+        M = C' * C
+        # ∫_0^2π ∫_ρ^1 exp(-r^2)^2 r dr dθ.
+        N = 100
+        @test fc[1:N]' * reshape(view(M, 1:N, 1:N)[:], N, N) * fc[1:N] ≈  π/2 * (exp(-2*0.2^2) - exp(-2))
 
-            # Test m = 1
-            C = ContinuousZernikeAnnulusElementMode([ρ; 1], 1, 0, via_Jacobi)
-            fc = C \ f1s.(axes(C,1))
-            M = C' * C
-            # ∫_0^2π ∫_ρ^1 exp(-r^2)^2 r^2 sin(θ)^2 r dr dθ.
-            N = 100
-            @test fc[1:N]' * reshape(view(M, 1:N, 1:N)[:], N, N) * fc[1:N] ≈ 0.2320693725039186
+        # Test m = 1
+        C = ContinuousZernikeAnnulusElementMode([ρ; 1], 1, 0)
+        fc = C \ f1s.(axes(C,1))
+        M = C' * C
+        # ∫_0^2π ∫_ρ^1 exp(-r^2)^2 r^2 sin(θ)^2 r dr dθ.
+        N = 100
+        @test fc[1:N]' * reshape(view(M, 1:N, 1:N)[:], N, N) * fc[1:N] ≈ 0.2320693725039186
 
-            # Test m = 6
-            Memoization.empty_all_caches!()
-            C = ContinuousZernikeAnnulusElementMode([ρ; 1], 6, 1, via_Jacobi)
-            fc = C \ f6.(axes(C,1))
-            M = C' * C
-            # ∫_0^2π ∫_ρ^1 exp(-r^2)^2 r^12 cos(6θ)^2 r dr dθ.
-            N = 100
-            @test fc[1:N]' * reshape(view(M, 1:N, 1:N)[:], N, N) * fc[1:N] ≈ 0.04005947846778158
-        end
+        # Test m = 6
+        Memoization.empty_all_caches!()
+        C = ContinuousZernikeAnnulusElementMode([ρ; 1], 6, 1)
+        fc = C \ f6.(axes(C,1))
+        M = C' * C
+        # ∫_0^2π ∫_ρ^1 exp(-r^2)^2 r^12 cos(6θ)^2 r dr dθ.
+        N = 100
+        @test fc[1:N]' * reshape(view(M, 1:N, 1:N)[:], N, N) * fc[1:N] ≈ 0.04005947846778158
     end
 
     @testset "differentiation matrix" begin
@@ -147,55 +143,51 @@ import RadialPiecewisePolynomials: ModalTrav, Fill, ApplyArray
     end
 
     @testset "transform scaling" begin
-        for via_Jacobi in [false, true]
-            Memoization.empty_all_caches!()
-            α = 0.5; β = 0.6; ρ = α / β
-            C = ContinuousZernikeAnnulusElementMode([α; β], 0, 1, via_Jacobi)
-            x = axes(C, 1)
+        Memoization.empty_all_caches!()
+        α = 0.5; β = 0.6; ρ = α / β
+        C = ContinuousZernikeAnnulusElementMode([α; β], 0, 1)
+        x = axes(C, 1)
 
-            C̃ = ContinuousZernikeAnnulusElementMode([ρ; 1], 0, 1, via_Jacobi)
+        C̃ = ContinuousZernikeAnnulusElementMode([ρ; 1], 0, 1)
 
-            @test C[SVector(α+eps(), 0), 1:10] ≈ C̃[SVector(ρ+eps(), 0), 1:10]
-            @test C[SVector(β-eps(), 0), 1:10] ≈ C̃[SVector(1-eps(), 0), 1:10]
+        @test C[SVector(α+eps(), 0), 1:10] ≈ C̃[SVector(ρ+eps(), 0), 1:10]
+        @test C[SVector(β-eps(), 0), 1:10] ≈ C̃[SVector(1-eps(), 0), 1:10]
 
-            f = C \ f0.(x)
-            for b in ([0.55, 0], [0.51, 0.02])
-                @test (C*f)[b] ≈ f0(b)
-            end
+        f = C \ f0.(x)
+        for b in ([0.55, 0], [0.51, 0.02])
+            @test (C*f)[b] ≈ f0(b)
+        end
 
-            C = ContinuousZernikeAnnulusElementMode([α; β], 1, 1, via_Jacobi)
-            C̃ = ContinuousZernikeAnnulusElementMode([ρ; 1], 1, 1, via_Jacobi)
+        C = ContinuousZernikeAnnulusElementMode([α; β], 1, 1)
+        C̃ = ContinuousZernikeAnnulusElementMode([ρ; 1], 1, 1)
 
-            @test C[SVector(α+eps(), 0), 1:10] ≈ C̃[SVector(ρ+eps(), 0), 1:10]
-            @test C[SVector(β-eps(), 0), 1:10] ≈ C̃[SVector(1-eps(), 0), 1:10]
+        @test C[SVector(α+eps(), 0), 1:10] ≈ C̃[SVector(ρ+eps(), 0), 1:10]
+        @test C[SVector(β-eps(), 0), 1:10] ≈ C̃[SVector(1-eps(), 0), 1:10]
 
-            f = C \ f1c.(axes(C,1))
-            for b in ([0.55, 0], [0.51, 0.02])
-                @test (C*f)[b] ≈ f1c(b)
-            end
+        f = C \ f1c.(axes(C,1))
+        for b in ([0.55, 0], [0.51, 0.02])
+            @test (C*f)[b] ≈ f1c(b)
         end
     end
 
     @testset "mass matrix scaling" begin
-        for via_Jacobi in [false, true]
-            Memoization.empty_all_caches!()
-            # Test mass matrix (m = 0)
-            α = 0.5; β = 0.6;
-            C = ContinuousZernikeAnnulusElementMode([α; β], 0, 1, via_Jacobi)
-            x = axes(C, 1)
-            f = C \ f0.(x)
-            M = C' * C
-            N=20
-            # <exp(-r^2), exp(-r^2)>_{L^2} = ∫_0^2π ∫_α^β  exp(-r^2)^2 r dr dθ
-            @test f[1:N]' * reshape(view(M, 1:N, 1:N)[:], N, N) * f[1:N] ≈ 0.188147476644037 # mathematica
+        Memoization.empty_all_caches!()
+        # Test mass matrix (m = 0)
+        α = 0.5; β = 0.6;
+        C = ContinuousZernikeAnnulusElementMode([α; β], 0, 1)
+        x = axes(C, 1)
+        f = C \ f0.(x)
+        M = C' * C
+        N=20
+        # <exp(-r^2), exp(-r^2)>_{L^2} = ∫_0^2π ∫_α^β  exp(-r^2)^2 r dr dθ
+        @test f[1:N]' * reshape(view(M, 1:N, 1:N)[:], N, N) * f[1:N] ≈ 0.188147476644037 # mathematica
 
-            # Test mass matrix (m = 1)
-            C = ContinuousZernikeAnnulusElementMode([α; β], 1, 1, via_Jacobi)
-            f = C \ f1c.(axes(C,1))
-            M = C' * C
-            # <exp(-r^2)*r*cos(θ), exp(-r^2)*r*cos(θ)>_{L^2} = ∫_0^2π ∫_α^β  (exp(-r^2)*r*cos(θ))^2 r dr dθ
-            @test f[1:N]' * reshape(view(M, 1:N, 1:N)[:], N, N) * f[1:N] ≈ 0.028502927676856027 # mathematica
-        end
+        # Test mass matrix (m = 1)
+        C = ContinuousZernikeAnnulusElementMode([α; β], 1, 1)
+        f = C \ f1c.(axes(C,1))
+        M = C' * C
+        # <exp(-r^2)*r*cos(θ), exp(-r^2)*r*cos(θ)>_{L^2} = ∫_0^2π ∫_α^β  (exp(-r^2)*r*cos(θ))^2 r dr dθ
+        @test f[1:N]' * reshape(view(M, 1:N, 1:N)[:], N, N) * f[1:N] ≈ 0.028502927676856027 # mathematica
     end
 
     @testset "differentiation matrix scaling" begin

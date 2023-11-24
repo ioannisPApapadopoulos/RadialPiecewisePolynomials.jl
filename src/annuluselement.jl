@@ -19,69 +19,63 @@ function _ann2element_via_Jacobi(t::T, m::Int) where T
     
     x = axes(Q₁₁, 1)
     X = jacobimatrix(Q₁₁)
-    L₁₁ = (X - X*X)/t^2
-    L₀₁ = (I - X)/t
-    L₁₀ = X/t
+    R₁₁ = (X - X*X)/t^2
+    R₀₁ = (I - X)/t
+    R₁₀ = X/t
 
-    (L₁₁, L₀₁, L₁₀)
+    (R₁₁, R₀₁, R₁₀)
 end
 
 # Matrices for lowering to ZernikeAnnulus(0,0) via
 # direct lowering. Slower for now, but actually lower complexity.
-function _ann2element_via_lowering(t::T, m::Int) where T
+function _ann2element_via_raising(t::T, m::Int) where T
     Q₀₀ = SemiclassicalJacobi(t, 0, 0, m)
     Q₀₁ = SemiclassicalJacobi(t, 0, 1, m)
     Q₁₀ = SemiclassicalJacobi(t, 1, 0, m)
     Q₁₁ = SemiclassicalJacobi(t, 1, 1, m)
 
-    L₁₁ = (Weighted(Q₀₀) \ Weighted(Q₁₁)) / t^2
-    L₀₁ = (Weighted(Q₀₀) \ Weighted(Q₀₁)) / t
-    L₁₀ = (Weighted(Q₀₀) \ Weighted(Q₁₀)) / t
+    R₁₁ = (Weighted(Q₀₀) \ Weighted(Q₁₁)) / t^2
+    R₀₁ = (Weighted(Q₀₀) \ Weighted(Q₀₁))[1:2,1] / t
+    R₁₀ = (Weighted(Q₀₀) \ Weighted(Q₁₀))[1:2,1] / t
 
-    (L₁₁, L₀₁, L₁₀)
+    Hcat(Vcat(R₁₀, Zeros{T}(∞)), Vcat(R₀₁, Zeros{T}(∞)), R₁₁)
 end
 
 struct ContinuousZernikeAnnulusElementMode{T} <: Basis{T}
     points::AbstractVector{T}
     m::Int
     j::Int
-    L₁₁::AbstractMatrix{T}
-    L₀₁::AbstractMatrix{T}
-    L₁₀::AbstractMatrix{T}
+    R::AbstractMatrix{T}
     D::AbstractMatrix{T}
     normalize_constants::AbstractVector{T}
-    via_Jacobi::Bool       # I use this as a flag to quickly switch between _ann2element_via_Jacobi or _ann2element_via_lowering
     b::Int # Should remove once adaptive expansion has been figured out.
 end
 
-function ContinuousZernikeAnnulusElementMode(points::AbstractVector{T}, m::Int, j::Int, L₁₁::AbstractMatrix, L₀₁::AbstractMatrix, L₁₀::AbstractMatrix, D::AbstractMatrix, normalize_constants::AbstractVector{T}, via_Jacobi::Bool, b::Int) where T
+function ContinuousZernikeAnnulusElementMode(points::AbstractVector{T}, m::Int, j::Int, R₁₁::AbstractMatrix, R₀₁::AbstractMatrix, R₁₀::AbstractMatrix, D::AbstractMatrix, normalize_constants::AbstractVector{T}, b::Int) where T
     @assert length(points) == 2 && zero(T) < points[1] < points[2] ≤ one(T)
     @assert m ≥ 0
     @assert m == 0 ? j == 1 : 0 ≤ j ≤ 1
     @assert length(normalize_constants) ≥ 2
     # @assert b ≥ m
-    ContinuousZernikeAnnulusElementMode{T}(points, m, j, L₁₁, L₀₁, L₁₀, D, normalize_constants, via_Jacobi, b)
+    ContinuousZernikeAnnulusElementMode{T}(points, m, j, R, D, normalize_constants, b)
 end
 
-function ContinuousZernikeAnnulusElementMode(points::AbstractVector{T}, m::Int, j::Int, via_Jacobi::Bool=false) where T
+function ContinuousZernikeAnnulusElementMode(points::AbstractVector{T}, m::Int, j::Int) where T
     α, β = convert(T, first(points)), convert(T, last(points))
     ρ = α / β
     t = inv(one(T)-ρ^2)
-    if via_Jacobi
-        (L₁₁, L₀₁, L₁₀) = _ann2element_via_Jacobi(t, m)
-        normalize_constants = [_sum_semiclassicaljacobiweight(t, 1, 1, m), _sum_semiclassicaljacobiweight(t, 2, 0, m), _sum_semiclassicaljacobiweight(t, 0, 2, m)]
-    else
-        (L₁₁, L₀₁, L₁₀) = _ann2element_via_lowering(t, m)
-        normalize_constants = [_sum_semiclassicaljacobiweight(t, a, a, m) for a in 1:-1:0]
-    end
+
+    normalize_constants = [_sum_semiclassicaljacobiweight(t, a, a, m) for a in 1:-1:0]
+    R = _ann2element_via_raising(t, m)
+
     Z = ZernikeAnnulus{T}(ρ,1,1)
     D = (Z \ (Laplacian(axes(Z,1))*Weighted(Z))).ops[m+1]
 
-    ContinuousZernikeAnnulusElementMode(points, m, j, L₁₁, L₀₁, L₁₀, D, normalize_constants, via_Jacobi, 200)
+    ContinuousZernikeAnnulusElementMode(points, m, j, R, D, normalize_constants, 200)
 end
 
-# ContinuousZernikeAnnulusElementMode(points::AbstractVector, m::Int, j::Int, L₁₁::AbstractMatrix, L₀₁::AbstractMatrix, L₁₀::AbstractMatrix, D::AbstractMatrix, b::Int) = ContinuousZernikeAnnulusElementMode{Float64}(points, m, j, L₁₁, L₀₁, L₁₀, D, b)
-# ContinuousZernikeAnnulusElementMode(points::AbstractVector, m::Int, j::Int, L₁₁::AbstractMatrix, L₀₁::AbstractMatrix, L₁₀::AbstractMatrix, D::AbstractMatrix) = ContinuousZernikeAnnulusElementMode(points, m, j, L₁₁, L₀₁, L₁₀, D, 200)
+# ContinuousZernikeAnnulusElementMode(points::AbstractVector, m::Int, j::Int, R₁₁::AbstractMatrix, R₀₁::AbstractMatrix, R₁₀::AbstractMatrix, D::AbstractMatrix, b::Int) = ContinuousZernikeAnnulusElementMode{Float64}(points, m, j, R₁₁, R₀₁, R₁₀, D, b)
+# ContinuousZernikeAnnulusElementMode(points::AbstractVector, m::Int, j::Int, R₁₁::AbstractMatrix, R₀₁::AbstractMatrix, R₁₀::AbstractMatrix, D::AbstractMatrix) = ContinuousZernikeAnnulusElementMode(points, m, j, R₁₁, R₀₁, R₁₀, D, 200)
 
 axes(Z::ContinuousZernikeAnnulusElementMode) = (Inclusion(annulus(first(Z.points), last(Z.points))), oneto(∞))
 ==(P::ContinuousZernikeAnnulusElementMode, Q::ContinuousZernikeAnnulusElementMode) = P.points == Q.points && P.m == Q.m && P.j == Q.j
@@ -135,10 +129,8 @@ function ldiv(C::ContinuousZernikeAnnulusElementMode{T}, f::AbstractQuasiVector)
 
     α, β = convert(T, first(C.points)), convert(T, last(C.points))
     ρ = α / β
-    m, j = C.m, C.j
 
-    w_a = C.via_Jacobi ? one(T) : zero(T)
-    Z = ZernikeAnnulus{T}(ρ, w_a, w_a)
+    Z = ZernikeAnnulus{T}(ρ, zero(T), zero(T))
 
     x = axes(Z,1)
     # # Need to take into account different scalings
@@ -156,10 +148,8 @@ function ldiv(C::ContinuousZernikeAnnulusElementMode{T}, f::AbstractQuasiVector)
     Ñ = findall(x->abs(x) > 2*eps(T), c̃)
     c̃ = isempty(Ñ) ? Zeros{T}(3) : c̃[1:Ñ[end]+min(5, length(c̃)-Ñ[end])]
     N = length(c̃) # degree
-    
-    t = inv(one(T)-ρ^2)
-    L₁₁, L₀₁, L₁₀ = C.L₁₁, C.L₀₁, C.L₁₀
-    R̃ = Hcat(view(L₁₀,1:N,1), view(L₀₁,1:N,1), view(L₁₁,1:N, 1:N-2))
+
+    R̃ = view(C.R, 1:N, 1:N)
 
     # convert from ZernikeAnnulus(ρ,w_a,w_a) to hats + Bubble
     dat = R̃[1:N,1:N] \ c̃
@@ -174,86 +164,49 @@ end
 
 function _sum_semiclassicaljacobiweight(t::T, a::Number, b::Number, c::Number) where T
     (t,a,b,c) = map(big, map(float, (t,a,b,c)))
-    return convert(T, t^c * beta(1+a,1+b) * _₂F₁general2(1+a,-c,2+a+b,1/t))
+    # return convert(T, t^c * beta(1+a,1+b) * _₂F₁general2(1+a,-c,2+a+b,1/t))
     # Working much better thanks to Timon Gutleb's efforts,
     # see https://github.com/JuliaApproximation/SemiclassicalOrthogonalPolynomials.jl/pull/90
-    # convert(T, first(sum.(SemiclassicalJacobiWeight.(t,a,b,c:c))))
+    convert(T, first(sum.(SemiclassicalJacobiWeight.(t,a,b,c:c))))
+end
+
+function _mass_m₀(C::ContinuousZernikeAnnulusElementMode, m::Int, t::T) where T
+    jw = C.normalize_constants[2] # _sum_semiclassicaljacobiweight(t,0,0,m)
+    m₀ = convert(T,π) / ( t^(one(T) + m) ) * jw
+    m₀ = m == 0 ? m₀ : m₀ / T(2)
+    return m₀
 end
 
 @simplify function *(A::QuasiAdjoint{<:Any,<:ContinuousZernikeAnnulusElementMode}, B::ContinuousZernikeAnnulusElementMode)
-    T = promote_type(eltype(A), eltype(B))
     @assert A' == B
-
-    α, β = convert(T, first(B.points)), convert(T, last(B.points))
-    ρ = α / β
-    m = B.m
-
-    t = inv(one(T)-ρ^2)
-    L₁₁, L₀₁, L₁₀ = B.L₁₁, B.L₀₁, B.L₁₀
-
-    if B.via_Jacobi
-        # Contribution from the mass matrix of harmonic polynomial
-        m₀ = convert(T,π) / ( t^(one(T) + m) )
-        m₀ = m == 0 ? m₀ : m₀ / T(2)
-
-        jw = B.normalize_constants[1]/t^2 #_sum_semiclassicaljacobiweight(t,1,1,m) / t^2
-        M = ApplyArray(*,Diagonal(Fill(jw,∞)),L₁₁)
-        a = jw.*view(L₁₀,1:2,1)
-        b = jw.*view(L₀₁,1:2,1)
-
-        a11 = B.normalize_constants[2]/ t^2 # _sum_semiclassicaljacobiweight(t,2,0,m)
-        a12 = jw
-        a22 = B.normalize_constants[3]/ t^2 # _sum_semiclassicaljacobiweight(t,0,2,m) / t^2
-
-        C = [a11 a12 a'; a12 a22 b']
-        M = Hcat(Vcat(C[1:2,3:4]', Zeros{T}(∞,2)), M)
-        return β^2*m₀*Vcat(Hcat(C, Zeros{T}(2,∞)), M)
-    else
-        # Contribution from the mass matrix of harmonic polynomial
-        jw = B.normalize_constants[2] # _sum_semiclassicaljacobiweight(t,0,0,m)
-        m₀ = convert(T,π) / ( t^(one(T) + m) ) * jw
-        m₀ = m == 0 ? m₀ : m₀ / T(2)
-
-        L = Hcat(Vcat(view(L₁₀,1:2,1:1)[1:2], Zeros{T}(∞)), Vcat(view(L₀₁,1:2,1:1)[1:2], Zeros{T}(∞)), L₁₁)
-        # TODO fix the excess zeros
-        return ApplyArray(*,Diagonal(Fill(β^2*m₀,∞)), ApplyArray(*, L', L))
-
-        # Old code - for deprecation
-        # M = ApplyArray(*, L₁₁', L₁₁)
-
-        # a = ApplyArray(*, view(L₁₁',1:2,1:2), view(L₁₀,1:2,1))
-        # b = ApplyArray(*, view(L₁₁',1:2,1:2), view(L₀₁,1:2,1))
-
-        # a11 = ApplyArray(*, view(L₁₀',1,1:2)', view(L₁₀,1:2,1))
-        # a12 = ApplyArray(*, view(L₁₀',1,1:2)', view(L₀₁,1:2,1))
-        # a22 = ApplyArray(*, view(L₀₁',1,1:2)', view(L₀₁,1:2,1))
-
-        # # C = Vcat(Hcat(a11[1], a12[1], [a;Zeros{T}(∞)]'), Hcat(a12[1], a22[1], [b;Zeros{T}(∞)]'))
-        # C = Vcat(Hcat(a11[1], a12[1], a'), Hcat(a12[1], a22[1], b'))[1:2,1:4]
-        # M = Hcat(Vcat(C[1:2,3:4]', Zeros{T}(∞,2)), M)
-        # return Vcat(Hcat(β^2*m₀*C, Zeros{T}(2,∞)), β^2*m₀*M)
-    end
+    mass_matrix(B)
 end
 
-@simplify function *(A::QuasiAdjoint{<:Any,<:ContinuousZernikeAnnulusElementMode}, B::BroadcastQuasiMatrix{<:Any, typeof(*), <:Tuple{BroadcastQuasiVector, <:ContinuousZernikeAnnulusElementMode}})
-    λ, C = B.args
-    T = promote_type(eltype(A), eltype(C))
-
-    @assert C.via_Jacobi == false
-    @assert A' == C
+function mass_matrix(C::ContinuousZernikeAnnulusElementMode)
+    T = eltype(C)
 
     α, β = convert(T, first(C.points)), convert(T, last(C.points))
     ρ = α / β
     m = C.m
 
     t = inv(one(T)-ρ^2)
-    L₁₁, L₀₁, L₁₀ = C.L₁₁, C.L₀₁, C.L₁₀
 
-    jw = C.normalize_constants[2] # _sum_semiclassicaljacobiweight(t,0,0,m)
-    m₀ = convert(T,π) / ( t^(one(T) + m) ) * jw
-    m₀ = m == 0 ? m₀ : m₀ / T(2)
-    L = Hcat(Vcat(view(L₁₀,1:2,1:1)[1:2], Zeros{T}(∞)), Vcat(view(L₀₁,1:2,1:1)[1:2], Zeros{T}(∞)), L₁₁)
+    m₀ = _mass_m₀(C, m, t)
+    # TODO fix the excess zeros
+    return ApplyArray(*,Diagonal(Fill(β^2*m₀,∞)), ApplyArray(*, C.R', C.R))
+end
 
+
+
+@simplify function *(A::QuasiAdjoint{<:Any,<:ContinuousZernikeAnnulusElementMode}, B::BroadcastQuasiMatrix{<:Any, typeof(*), <:Tuple{BroadcastQuasiVector, <:ContinuousZernikeAnnulusElementMode}})
+    λ, C = B.args
+    @assert A' == C
+    T = eltype(C)
+
+    α, β = convert(T, first(C.points)), convert(T, last(C.points))
+    ρ = α / β
+    m = C.m
+    t = inv(one(T)-ρ^2)
     # We need to compute the Jacobi matrix multiplier addition due to the
     # variable Helmholtz coefficient λ(r²). We expand λ(r²) in chebyshevt
     # and then use Clenshaw to compute λ(β^2*(I-X/t)) where X is the 
@@ -261,10 +214,22 @@ end
     Tn = chebyshevt(C.points[1]..C.points[2])
     u = Tn \ λ.f.(axes(Tn,1))
     X = jacobimatrix(SemiclassicalJacobi(t, 0, 0, m))
-    W = Clenshaw(paddeddata(u), recurrencecoefficients(Tn)..., β^2*(I-X/t), _p0(Tn))
+    Λ = Clenshaw(paddeddata(u), recurrencecoefficients(Tn)..., β^2*(I-X/t), _p0(Tn))
+
+    assembly_matrix(C, Λ)
+end
+
+function assembly_matrix(C::ContinuousZernikeAnnulusElementMode, Λ::AbstractMatrix)
+    T = eltype(C)
+    α, β = convert(T, first(C.points)), convert(T, last(C.points))
+    ρ = α / β
+    m = C.m
+
+    t = inv(one(T)-ρ^2)
+    m₀ = _mass_m₀(C, m, t)
 
     # TODO fix the excess zeros
-    return ApplyArray(*,Diagonal(Fill(β^2*m₀,∞)), ApplyArray(*, L', ApplyArray(*, W, L)))
+    ApplyArray(*,Diagonal(Fill(β^2*m₀,∞)), ApplyArray(*, C.R', ApplyArray(*, Λ, C.R)))
 end
 
 
@@ -319,20 +284,24 @@ function W_100_010(m::Int, ρ::T) where T
 end
 
 @simplify function *(A::QuasiAdjoint{<:Any,<:GradientContinuousZernikeAnnulusElementMode}, B::GradientContinuousZernikeAnnulusElementMode)
-    T = promote_type(eltype(A), eltype(B))
-    α, β = convert(T, first(B.C.points)), convert(T, last(B.C.points))
+    @assert A' == B
+    C = B.C
+    stiffness_matrix(C)
+end
+
+function stiffness_matrix(C::ContinuousZernikeAnnulusElementMode)
+    T = eltype(C)
+    α, β = convert(T, first(C.points)), convert(T, last(C.points))
     ρ = α / β
-    m = B.C.m
-    # # Scaling if outer radius is β instead of 1.
-    # s = inv(( (one(T)- ρ) / (β - ρ) )^2)
+    m = C.m
     
     # Contribution from the normalisation <w R_m,j^(ρ,1,1,0),R_m,j^(ρ,1,1,0)>_L^2
     t = inv(one(T)-ρ^2)
-    jw = B.C.normalize_constants[1] # _sum_semiclassicaljacobiweight(t,1,1,m)
+    jw = C.normalize_constants[1] # _sum_semiclassicaljacobiweight(t,1,1,m)
     m₀ = convert(T,π) / ( t^(3 + m) ) * jw
     m₀ = m == 0 ? m₀ : m₀ / 2
 
-    Δ = - m₀ * B.C.D
+    Δ = - m₀ * C.D
     if m == 0
         c = convert(T,2π)*(one(T) - ρ^4)
         C = [c -c 4*m₀*(m+1); -c c -4*m₀*(m+1)]
@@ -362,13 +331,11 @@ function scalegrid(g::Matrix{RadialCoordinate{T}}, α::T, β::T) where T
 end
 
 function bubble2ann(C::ContinuousZernikeAnnulusElementMode, c::AbstractVector{T}) where T
-    L₁₁, L₀₁, L₁₀ = C.L₁₁, C.L₀₁, C.L₁₀
     if c isa LazyArray
         c = paddeddata(c)
     end
     N = length(c)
-    R̃ = Hcat(view(L₁₀,1:N,1), view(L₀₁,1:N,1), view(L₁₁,1:N, 1:N-2))
-
+    R̃ = view(C.R, 1:N, 1:N) #Hcat(view(R₁₀,1:N,1), view(R₀₁,1:N,1), view(R₁₁,1:N, 1:N-2))
     R̃ * c # coefficients for ZernikeAnnulus(ρ,w_a,w_a)
 end
 
@@ -395,9 +362,8 @@ function plotvalues(u::ApplyQuasiVector{T,typeof(*),<:Tuple{ContinuousZernikeAnn
     # Scale the grid
     g = scalegrid(grid(C, N), α, β)
 
-    w_a = C.via_Jacobi ? 1 : 0
     # Use fast transforms for synthesis
-    FT = ZernikeAnnulusITransform{T}(N+C.m, w_a, w_a, 0, ρ)
+    FT = ZernikeAnnulusITransform{T}(N+C.m, 0, 0, 0, ρ)
     g, FT * pad(F,blockedrange(oneto(∞)))[Block.(OneTo(N+C.m))]
 end
 
