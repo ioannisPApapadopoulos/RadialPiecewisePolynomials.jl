@@ -113,6 +113,7 @@ end
     λ, C = B.args
     T = promote_type(eltype(A), eltype(C))
     @assert A' == C
+    m, ρ = C.m, convert(T, last(C.points))
 
     # We need to compute the Jacobi matrix multiplier addition due to the
     # variable Helmholtz coefficient λ(r²). We expand λ(r²) in chebyshevt

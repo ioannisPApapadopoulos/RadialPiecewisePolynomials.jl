@@ -25,7 +25,6 @@ end
 
 ==(P::ZernikeBasisMode, Q::ZernikeBasisMode) = P.points == Q.points && P.m == Q.m && P.j == Q.j && P.a == Q.a && P.b == Q.b
 
-
 # The Zernike (annular) basis on multiple elements and single Fourier mode
 struct FiniteZernikeBasisMode{T, P<:AbstractArray{T}} <: Basis{T}
     N::Int
@@ -142,8 +141,10 @@ end
 # L2 inner product matrices
 ####
 
-# @simplify function *(FT::QuasiAdjoint{<:Any,<:ContinuousZernikeAnnulusElementMode}, Ψ::ZernikeBasisMode)
-function gramm_matrix(C::ContinuousZernikeAnnulusElementMode, Ψ::ZernikeBasisMode)
+@simplify function *(FT::QuasiAdjoint{<:Any,<:ContinuousZernikeAnnulusElementMode}, Ψ::ZernikeBasisMode)
+    gram_matrix(FT.parent, Ψ)
+end
+function gram_matrix(C::ContinuousZernikeAnnulusElementMode, Ψ::ZernikeBasisMode)
     T = promote_type(eltype(C), eltype(Ψ))
 
     @assert C.points == Ψ.points && C.m == Ψ.m && C.j == Ψ.j
@@ -161,8 +162,10 @@ function gramm_matrix(C::ContinuousZernikeAnnulusElementMode, Ψ::ZernikeBasisMo
     end
 end
 
-# @simplify function *(FT::QuasiAdjoint{<:Any,<:ContinuousZernikeElementMode}, Ψ::ZernikeBasisMode)
-function gramm_matrix(C::ContinuousZernikeElementMode, Ψ::ZernikeBasisMode)
+@simplify function *(FT::QuasiAdjoint{<:Any,<:ContinuousZernikeElementMode}, Ψ::ZernikeBasisMode)
+    gram_matrix(FT.parent, Ψ)
+end
+function gram_matrix(C::ContinuousZernikeElementMode, Ψ::ZernikeBasisMode)
     T = promote_type(eltype(C), eltype(Ψ))
 
     @assert C.points == Ψ.points && C.m == Ψ.m && C.j == Ψ.j
@@ -261,8 +264,10 @@ function _arrow_head_matrix(F::FiniteContinuousZernikeMode, Ψ::FiniteZernikeBas
     ArrowheadMatrix{T}(A, B, C, D)
 end
 
-# @simplify function *(FT::QuasiAdjoint{<:Any,<:FiniteContinuousZernikeMode}, Ψ::FiniteZernikeBasisMode)
-function gramm_matrix(F::FiniteContinuousZernikeMode, Ψ::FiniteZernikeBasisMode)
+@simplify function *(FT::QuasiAdjoint{<:Any,<:FiniteContinuousZernikeMode}, Ψ::FiniteZernikeBasisMode)
+    gram_matrix(FT.parent, Ψ)
+end
+function gram_matrix(F::FiniteContinuousZernikeMode, Ψ::FiniteZernikeBasisMode)
     T = promote_type(eltype(F), eltype(Ψ))
 
     @assert F.N == Ψ.N && F.points == Ψ.points && F.m == Ψ.m && F.j == Ψ.j
@@ -272,7 +277,7 @@ function gramm_matrix(F::FiniteContinuousZernikeMode, Ψ::FiniteZernikeBasisMode
     Cs = _getCs(F)
     Zs = _getZs(Ψ)
     γs = _getγs(F)
-    Ms = [gramm_matrix(C, Z̃) for (C, Z̃) in zip(Cs, Zs)]
+    Ms = [gram_matrix(C, Z̃) for (C, Z̃) in zip(Cs, Zs)]
 
     _arrow_head_matrix(F, Ψ, Ms, γs, F.N, first(F.points))[Block.(1:N-1), :]
 
@@ -286,7 +291,7 @@ end
         N, points = Ψ.N, T.(Ψ.points);
         Fs = _getFs(N, points)
         Zs = _getFZs(N, points, Ψ.a, Ψ.b)
-        [gramm_matrix(F̃, Z̃) for (F̃, Z̃) in zip(Fs, Zs)]
+        [gram_matrix(F̃, Z̃) for (F̃, Z̃) in zip(Fs, Zs)]
 end
 
 

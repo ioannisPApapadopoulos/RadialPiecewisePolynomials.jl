@@ -260,8 +260,8 @@ end
 # Assembly
 ###
 @simplify function *(A::QuasiAdjoint{<:Any,<:FiniteContinuousZernikeMode}, B::BroadcastQuasiMatrix{<:Any, typeof(*), <:Tuple{BroadcastQuasiVector, FiniteContinuousZernikeMode}})
-    T = promote_type(eltype(A), eltype(B))
     λ, F = B.args
+    T = promote_type(eltype(A), eltype(F))
     @assert A' == F
 
     K, points = lastindex(F.points)-1, F.points
@@ -271,7 +271,7 @@ end
     end
     ts = inv.(one(T) .- ρs.^2)
 
-    Λs = []
+    Λs = AbstractMatrix{T}[]
     for j in 1:K
         Tn = chebyshevt(points[j]..points[j+1])
         u = Tn \ λ.f.(axes(Tn,1))

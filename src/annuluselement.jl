@@ -201,7 +201,12 @@ end
 @simplify function *(A::QuasiAdjoint{<:Any,<:ContinuousZernikeAnnulusElementMode}, B::BroadcastQuasiMatrix{<:Any, typeof(*), <:Tuple{BroadcastQuasiVector, <:ContinuousZernikeAnnulusElementMode}})
     λ, C = B.args
     @assert A' == C
+    T = eltype(C)
 
+    α, β = convert(T, first(C.points)), convert(T, last(C.points))
+    ρ = α / β
+    m = C.m
+    t = inv(one(T)-ρ^2)
     # We need to compute the Jacobi matrix multiplier addition due to the
     # variable Helmholtz coefficient λ(r²). We expand λ(r²) in chebyshevt
     # and then use Clenshaw to compute λ(β^2*(I-X/t)) where X is the 
