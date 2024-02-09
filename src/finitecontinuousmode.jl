@@ -226,7 +226,7 @@ function _arrow_head_matrix(F::FiniteContinuousZernikeMode, Ms, γs::AbstractArr
     A = _build_top_left_block(F,Ms, γs, p)
     B = _build_second_block(F,Ms, γs, bs, p)
     D = _build_trailing_bubbles(F,Ms, N, bs, p)
-    Symmetric(ArrowheadMatrix{T}(A, B, (), D))
+    Symmetric(BBBArrowheadMatrix{T}(A, B, (), D))
 end
 
 

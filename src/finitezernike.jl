@@ -182,7 +182,7 @@ function gram_matrix(C::ContinuousZernikeElementMode, Ψ::ZernikeBasisMode)
     end
 end
 
-### Helper functions for building the ArrowheadMatrix
+### Helper functions for building the BBBArrowheadMatrix
 # Interaction of hats with lowest order Zernike
 function _build_top_left_block(F::FiniteContinuousZernikeMode{T}, Ψ::FiniteZernikeBasisMode{T}, Ms, γs::AbstractArray{T}, p::T) where T
     K = length(Ms)
@@ -261,7 +261,7 @@ function _arrow_head_matrix(F::FiniteContinuousZernikeMode, Ψ::FiniteZernikeBas
     A = _build_top_left_block(F,Ψ,Ms, γs, p)
     B, C = _build_second_block(F,Ψ,Ms, γs,  p)
     D = _build_trailing_bubbles(F,Ψ,Ms, N,  p)
-    ArrowheadMatrix{T}(A, B, C, D)
+    BBBArrowheadMatrix{T}(A, B, C, D)
 end
 
 @simplify function *(FT::QuasiAdjoint{<:Any,<:FiniteContinuousZernikeMode}, Ψ::FiniteZernikeBasisMode)
