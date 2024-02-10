@@ -17,7 +17,7 @@ import LazyArrays: Vcat
 import SpecialFunctions: beta
 import HypergeometricFunctions: _₂F₁general2
 import BlockBandedMatrices: _BandedBlockBandedMatrix, AbstractBandedBlockBandedMatrix, subblockbandwidths, blockbandwidths, AbstractBandedBlockBandedLayout, layout_replace_in_print_matrix
-import PiecewiseOrthogonalPolynomials: ArrowheadMatrix
+import PiecewiseOrthogonalPolynomials: BBBArrowheadMatrix
 
 export SVector, Zeros, Ones, Vcat, Derivative, pad, paddeddata, Hcat, RadialCoordinate, Block,
         ContinuousZernikeElementMode, ContinuousZernikeAnnulusElementMode, grid, plotvalues, plot_helper,
@@ -26,7 +26,7 @@ export SVector, Zeros, Ones, Vcat, Derivative, pad, paddeddata, Hcat, RadialCoor
         finite_plotvalues, inf_error, plot,
         FiniteContinuousZernikeMode, FiniteContinuousZernike, inf_error,
         FiniteZernikeBasis, ZernikeBasisMode, FiniteZernikeBasisMode,
-        ArrowheadMatrix,
+        BBBArrowheadMatrix,
         get_rs, get_θs, getNs,
         mass_matrix, assembly_matrix, stiffness_matrix, gram_matrix, piecewise_constant_assembly_matrix
 

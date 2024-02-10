@@ -205,7 +205,7 @@ end
     stiffness_matrix.(Fs)
 end
 
-# function zero_dirichlet_bcs!(Φ::FiniteContinuousZernike{T}, Δ::AbstractVector{<:LinearAlgebra.Symmetric{T,<:ArrowheadMatrix{T}}}) where T
+# function zero_dirichlet_bcs!(Φ::FiniteContinuousZernike{T}, Δ::AbstractVector{<:LinearAlgebra.Symmetric{T,<:BBBArrowheadMatrix{T}}}) where T
 #     @assert length(Δ) == 2*Φ.N-1
 #     Fs = _getFs(Φ.N, Φ.points)
 #     zero_dirichlet_bcs!.(Fs, Δ)
@@ -213,7 +213,7 @@ end
 
 function zero_dirichlet_bcs!(Φ::FiniteContinuousZernike{T}, Δ::AbstractVector{<:AbstractMatrix}) where T
     @assert length(Δ) == 2*Φ.N-1
-    # @assert Δ[1] isa LinearAlgebra.Symmetric{T, <:ArrowheadMatrix{T}}
+    # @assert Δ[1] isa LinearAlgebra.Symmetric{T, <:BBBArrowheadMatrix{T}}
     Fs = Φ.Fs #_getFs(Φ.N, Φ.points)
     zero_dirichlet_bcs!.(Fs, Δ)
 end
