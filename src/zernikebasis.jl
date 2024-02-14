@@ -1,5 +1,5 @@
 # The Zernike (annular) basis on a single reference element and single Fourier mode
-struct ZernikeBasisMode{T, P<:AbstractArray{T}} <: Basis{T}
+struct ZernikeBasisModeElement{T, P<:AbstractArray{T}} <: Basis{T}
     points::P
     a::Int
     b::Int
@@ -7,14 +7,14 @@ struct ZernikeBasisMode{T, P<:AbstractArray{T}} <: Basis{T}
     j::Int
 end
 
-function ZernikeBasisMode(points::AbstractVector{T}, a::Int, b::Int, m::Int, j::Int) where T
+function ZernikeBasisModeElement(points::AbstractVector{T}, a::Int, b::Int, m::Int, j::Int) where T
     @assert length(points) == 2 && zero(T) ≤ points[1] < points[2] ≤ one(T)
     @assert m ≥ 0
     @assert m == 0 ? j == 1 : 0 ≤ j ≤ 1
-    ZernikeBasisMode{T, Vector{T}}(points, a, b, m, j)
+    ZernikeBasisModeElement{T, Vector{T}}(points, a, b, m, j)
 end
 
-function axes(Ψ::ZernikeBasisMode)
+function axes(Ψ::ZernikeBasisModeElement)
     α = first(Ψ.points)
     if α ≈ 0
         (Inclusion(last(Ψ.points)*UnitDisk{eltype(Ψ)}()), oneto(∞))
@@ -23,10 +23,10 @@ function axes(Ψ::ZernikeBasisMode)
     end
 end
 
-==(P::ZernikeBasisMode, Q::ZernikeBasisMode) = P.points == Q.points && P.m == Q.m && P.j == Q.j && P.a == Q.a && P.b == Q.b
+==(P::ZernikeBasisModeElement, Q::ZernikeBasisModeElement) = P.points == Q.points && P.m == Q.m && P.j == Q.j && P.a == Q.a && P.b == Q.b
 
 # The Zernike (annular) basis on multiple elements and single Fourier mode
-struct FiniteZernikeBasisMode{T, P<:AbstractArray{T}} <: Basis{T}
+struct ZernikeBasisMode{T, P<:AbstractArray{T}} <: Basis{T}
     N::Int
     points::P
     a::Int
@@ -34,32 +34,32 @@ struct FiniteZernikeBasisMode{T, P<:AbstractArray{T}} <: Basis{T}
     m::Int
     j::Int
 end
-function FiniteZernikeBasisMode(N::Int, points::AbstractVector{T}, a::Int, b::Int, m::Int, j::Int) where T
+function ZernikeBasisMode(N::Int, points::AbstractVector{T}, a::Int, b::Int, m::Int, j::Int) where T
     @assert length(points) > 1 && points == sort(points)
     @assert m ≥ 0
     @assert m == 0 ? j == 1 : 0 ≤ j ≤ 1
-    FiniteZernikeBasisMode{T, Vector{T}}(N, points, a, b, m, j)
+    ZernikeBasisMode{T, Vector{T}}(N, points, a, b, m, j)
 end
 
-function axes(Ψ::FiniteZernikeBasisMode{T}) where T
+function axes(Ψ::ZernikeBasisMode{T}) where T
     first(Ψ.points) ≈ 0 && return (Inclusion(last(Ψ.points)*UnitDisk{T}()), blockedrange(Fill(length(Ψ.points) - 1, Ψ.N-1)))
     (Inclusion(annulus(first(Ψ.points), last(Ψ.points))), blockedrange(Fill(length(Ψ.points) - 1, Ψ.N-1)))
 end
-==(P::FiniteZernikeBasisMode, Q::FiniteZernikeBasisMode) = P.N == Q.N && P.points == Q.points && P.m == Q.m && P.j == Q.j && P.a == Q.a && P.b == Q.b
+==(P::ZernikeBasisMode, Q::ZernikeBasisMode) = P.N == Q.N && P.points == Q.points && P.m == Q.m && P.j == Q.j && P.a == Q.a && P.b == Q.b
 
 
 function _getZs(points::AbstractVector{T}, a::Int, b::Int, m::Int, j::Int) where T
     K = length(points)-1
-    return [ZernikeBasisMode([points[k]; points[k+1]], a, b, m, j) for k in 1:K]
+    return [ZernikeBasisModeElement([points[k]; points[k+1]], a, b, m, j) for k in 1:K]
 end
 
-function _getZs(F::FiniteZernikeBasisMode)
+function _getZs(F::ZernikeBasisMode)
     points, a, b, m, j = F.points, F.a, F.b, F.m, F.j
     _getZs(points, a, b, m, j)
 end
 
 # The Zernike (annular) basis on multiple elements and all Fourier modes
-struct FiniteZernikeBasis{T} <: Basis{T}
+struct ZernikeBasis{T} <: Basis{T}
     N::Int
     points::AbstractVector{T}
     a::Int
@@ -67,7 +67,7 @@ struct FiniteZernikeBasis{T} <: Basis{T}
     Zs::AbstractArray
 end
 
-function FiniteZernikeBasis(N::Int, points::AbstractVector{T}, a::Int, b::Int) where T
+function ZernikeBasis(N::Int, points::AbstractVector{T}, a::Int, b::Int) where T
     @assert length(points) > 1 && points == sort(points)
     ρs = []
     for k = 1:length(points)-1
@@ -80,14 +80,14 @@ function FiniteZernikeBasis(N::Int, points::AbstractVector{T}, a::Int, b::Int) w
     else
         Zs = ZernikeAnnulus{T}.(ρs, a, b)
     end
-    FiniteZernikeBasis{T}(N, points, a, b, Zs)
+    ZernikeBasis{T}(N, points, a, b, Zs)
 end
 
-function axes(Ψ::FiniteZernikeBasis{T}) where T
+function axes(Ψ::ZernikeBasis{T}) where T
     first(Ψ.points) ≈ 0 && return (Inclusion(last(Ψ.points)*UnitDisk{T}()), oneto(Ψ.N*(length(Ψ.points)-1)))
     (Inclusion(annulus(first(Ψ.points), last(Ψ.points))), oneto(Ψ.N*(length(Ψ.points)-1)))
 end
-==(P::FiniteZernikeBasis, Q::FiniteZernikeBasis) = P.N == Q.N && P.points == Q.points
+==(P::ZernikeBasis, Q::ZernikeBasis) = P.N == Q.N && P.points == Q.points
 
 function _getFZs(N::Int, points::AbstractArray{T}, a::Int, b::Int) where T
     # Ordered list of Fourier modes (ms, js) and correct length for each Fourier mode Ms.
@@ -97,17 +97,17 @@ function _getFZs(N::Int, points::AbstractArray{T}, a::Int, b::Int) where T
     Fs = []
     for (M, m, j) in zip(Ms, ms, js)
         # Construct the structs for each Fourier mode seperately
-        append!(Fs, [FiniteZernikeBasisMode(M, points, a, b, m, j)])
+        append!(Fs, [ZernikeBasisMode(M, points, a, b, m, j)])
     end
     return Fs
 end
 
-_getFZs(Ψ::FiniteZernikeBasis{T}) where T = _getFZs(Ψ.N, Ψ.points, Ψ.a, Ψ.b)
+_getFZs(Ψ::ZernikeBasis{T}) where T = _getFZs(Ψ.N, Ψ.points, Ψ.a, Ψ.b)
 
 ####
 # Transforms (analysis)
 ####
-function ldiv(Ψ::FiniteZernikeBasis{T}, f::AbstractQuasiVector) where T
+function ldiv(Ψ::ZernikeBasis{T}, f::AbstractQuasiVector) where T
 
     N, points, Zs = Ψ.N, Ψ.points, Ψ.Zs
     
@@ -141,10 +141,10 @@ end
 # L2 inner product matrices
 ####
 
-@simplify function *(FT::QuasiAdjoint{<:Any,<:ContinuousZernikeAnnulusElementMode}, Ψ::ZernikeBasisMode)
+@simplify function *(FT::QuasiAdjoint{<:Any,<:ContinuousZernikeAnnulusElementMode}, Ψ::ZernikeBasisModeElement)
     gram_matrix(FT.parent, Ψ)
 end
-function gram_matrix(C::ContinuousZernikeAnnulusElementMode, Ψ::ZernikeBasisMode)
+function gram_matrix(C::ContinuousZernikeAnnulusElementMode, Ψ::ZernikeBasisModeElement)
     T = promote_type(eltype(C), eltype(Ψ))
 
     @assert C.points == Ψ.points && C.m == Ψ.m && C.j == Ψ.j
@@ -158,14 +158,14 @@ function gram_matrix(C::ContinuousZernikeAnnulusElementMode, Ψ::ZernikeBasisMod
         m₀ = _mass_m₀(C,m,t)
         ApplyArray(*,Diagonal(Fill(β^2*m₀,∞)), C.R')
     else
-        error("L²-inner product between ContinuousZernikeAnnulusElementMode and ZernikeBasisMode not implemented for parameters Ψ.a = $a and Ψ.b = $b")
+        error("L²-inner product between ContinuousZernikeAnnulusElementMode and ZernikeBasisModeElement not implemented for parameters Ψ.a = $a and Ψ.b = $b")
     end
 end
 
-@simplify function *(FT::QuasiAdjoint{<:Any,<:ContinuousZernikeElementMode}, Ψ::ZernikeBasisMode)
+@simplify function *(FT::QuasiAdjoint{<:Any,<:ContinuousZernikeElementMode}, Ψ::ZernikeBasisModeElement)
     gram_matrix(FT.parent, Ψ)
 end
-function gram_matrix(C::ContinuousZernikeElementMode, Ψ::ZernikeBasisMode)
+function gram_matrix(C::ContinuousZernikeElementMode, Ψ::ZernikeBasisModeElement)
     T = promote_type(eltype(C), eltype(Ψ))
 
     @assert C.points == Ψ.points && C.m == Ψ.m && C.j == Ψ.j
@@ -178,13 +178,13 @@ function gram_matrix(C::ContinuousZernikeElementMode, Ψ::ZernikeBasisMode)
         R = Zernike(0) \ Weighted(Zernike(1))
         Vcat(Hcat(β^2, Zeros{T}(1,∞)), β^2*R.ops[m+1]')
     else
-        error("L²-inner product between ContinuousZernikeElementMode and ZernikeBasisMode not implemented for parameters Ψ.a = $a and Ψ.b = $b")
+        error("L²-inner product between ContinuousZernikeElementMode and ZernikeBasisModeElement not implemented for parameters Ψ.a = $a and Ψ.b = $b")
     end
 end
 
 ### Helper functions for building the BBBArrowheadMatrix
 # Interaction of hats with lowest order Zernike
-function _build_top_left_block(F::FiniteContinuousZernikeMode{T}, Ψ::FiniteZernikeBasisMode{T}, Ms, γs::AbstractArray{T}, p::T) where T
+function _build_top_left_block(F::ContinuousZernikeMode{T}, Ψ::ZernikeBasisMode{T}, Ms, γs::AbstractArray{T}, p::T) where T
     K = length(Ms)
     if p ≈ 0
         dv, ev = zeros(T, K), zeros(T,K-1)
@@ -207,7 +207,7 @@ function _build_top_left_block(F::FiniteContinuousZernikeMode{T}, Ψ::FiniteZern
 end
 
 # Interaction of hats with next lower order Zernike
-function _build_second_block(F::FiniteContinuousZernikeMode{T}, Ψ::FiniteZernikeBasisMode{T}, Ms, γs::AbstractArray{T}, p::T) where T
+function _build_second_block(F::ContinuousZernikeMode{T}, Ψ::ZernikeBasisMode{T}, Ms, γs::AbstractArray{T}, p::T) where T
     K = length(Ms)
     if p ≈ 0
         dv, ev = zeros(T, K), zeros(T,K-1)
@@ -242,7 +242,7 @@ function _build_second_block(F::FiniteContinuousZernikeMode{T}, Ψ::FiniteZernik
 end
 
 # Interaction of the bubbles with Zernike
-function _build_trailing_bubbles(F::FiniteContinuousZernikeMode{T}, Ψ::FiniteZernikeBasisMode{T}, Ms, N::Int, p::T) where T
+function _build_trailing_bubbles(F::ContinuousZernikeMode{T}, Ψ::ZernikeBasisMode{T}, Ms, N::Int, p::T) where T
     K = length(Ms)
     if p ≈ 0
         # Mn = vcat([Ms[1][2:N-1,2:N]], [Ms[i][3:N, 2:N] for i in 2:K])
@@ -257,17 +257,17 @@ function _build_trailing_bubbles(F::FiniteContinuousZernikeMode{T}, Ψ::FiniteZe
     return [BandedMatrix{T}(M...) for M in Mn]
 end
 
-function _arrow_head_matrix(F::FiniteContinuousZernikeMode, Ψ::FiniteZernikeBasisMode, Ms, γs::AbstractArray{T}, N::Int, p::T) where T
+function _arrow_head_matrix(F::ContinuousZernikeMode, Ψ::ZernikeBasisMode, Ms, γs::AbstractArray{T}, N::Int, p::T) where T
     A = _build_top_left_block(F,Ψ,Ms, γs, p)
     B, C = _build_second_block(F,Ψ,Ms, γs,  p)
     D = _build_trailing_bubbles(F,Ψ,Ms, N,  p)
     BBBArrowheadMatrix{T}(A, B, C, D)
 end
 
-@simplify function *(FT::QuasiAdjoint{<:Any,<:FiniteContinuousZernikeMode}, Ψ::FiniteZernikeBasisMode)
+@simplify function *(FT::QuasiAdjoint{<:Any,<:ContinuousZernikeMode}, Ψ::ZernikeBasisMode)
     gram_matrix(FT.parent, Ψ)
 end
-function gram_matrix(F::FiniteContinuousZernikeMode, Ψ::FiniteZernikeBasisMode)
+function gram_matrix(F::ContinuousZernikeMode, Ψ::ZernikeBasisMode)
     T = promote_type(eltype(F), eltype(Ψ))
 
     @assert F.N == Ψ.N && F.points == Ψ.points && F.m == Ψ.m && F.j == Ψ.j
@@ -283,25 +283,28 @@ function gram_matrix(F::FiniteContinuousZernikeMode, Ψ::FiniteZernikeBasisMode)
 
 end
 
-@simplify function *(FT::QuasiAdjoint{<:Any,<:FiniteContinuousZernike}, Ψ::FiniteZernikeBasis)
+@simplify function *(FT::QuasiAdjoint{<:Any,<:ContinuousZernike}, Ψ::ZernikeBasis)
         T = promote_type(eltype(FT), eltype(Ψ))
         F = FT.parent
-        @assert F.N == Ψ.N && F.points == Ψ.points
-
-        N, points = Ψ.N, T.(Ψ.points);
-        Fs = _getFs(N, points)
-        Zs = _getFZs(N, points, Ψ.a, Ψ.b)
-        [gram_matrix(F̃, Z̃) for (F̃, Z̃) in zip(Fs, Zs)]
+        gram_matrix(F, Ψ)
 end
 
+function gram_matrix(F::ContinuousZernike, Ψ::ZernikeBasis)
+    T = promote_type(eltype(F), eltype(Ψ))
+    @assert F.N == Ψ.N && F.points == Ψ.points
 
+    N, points = Ψ.N, T.(Ψ.points);
+    Fs = F.Fs
+    Zs = _getFZs(N, points, Ψ.a, Ψ.b)
+    [gram_matrix(F̃, Z̃) for (F̃, Z̃) in zip(Fs, Zs)]
+end
 ###
 # Plotting
 ##
 # This helper function takes the list of coefficient values from ldiv and converts them into 
 # a 3-tensor of degree × Fourier mode × element.
 
-function _bubble2disk_or_ann_all_modes(Ψ::FiniteZernikeBasis{T}, us::AbstractVector) where T
+function _bubble2disk_or_ann_all_modes(Ψ::ZernikeBasis{T}, us::AbstractVector) where T
     points = T.(Ψ.points); K = length(points)-1
     N = Ψ.N;
     Ms, _, _ = _getMs_ms_js(N)
@@ -318,7 +321,7 @@ function _bubble2disk_or_ann_all_modes(Ψ::FiniteZernikeBasis{T}, us::AbstractVe
 end
 
 
-function finite_plotvalues(Ψ::FiniteZernikeBasis{T}, us::AbstractVector; N=0, K=0) where T
+function finite_plotvalues(Ψ::ZernikeBasis{T}, us::AbstractVector; N=0, K=0) where T
     _, Ũs = _bubble2disk_or_ann_all_modes(Ψ, us)
     points= T.(Ψ.points)
     K = K==0 ? lastindex(Ψ.points)-1 : K
@@ -347,7 +350,7 @@ function finite_plotvalues(Ψ::FiniteZernikeBasis{T}, us::AbstractVector; N=0, K
 end
 
 ### Error collection
-function inf_error(Ψ::FiniteZernikeBasis{T}, θs::AbstractVector, rs::AbstractVector, vals::AbstractVector, u::Function; K=0) where T
+function inf_error(Ψ::ZernikeBasis{T}, θs::AbstractVector, rs::AbstractVector, vals::AbstractVector, u::Function; K=0) where T
     K = K==0 ? lastindex(Ψ.points)-1 : K
     _inf_error(K, θs, rs, vals, u)
 end

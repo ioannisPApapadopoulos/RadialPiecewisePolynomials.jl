@@ -18,8 +18,8 @@ end
 
 @testset "finiteannulus" begin
     @testset "basics" begin
-        N=10; F = FiniteContinuousZernike(N, [0.5; 0.7; 1])
-        @test F isa FiniteContinuousZernike
+        N=10; F = ContinuousZernike(N, [0.5; 0.7; 1])
+        @test F isa ContinuousZernike
         @test F.points == [0.5; 0.7; 1.0]
         @test F.N == N
     end
@@ -43,7 +43,7 @@ end
         K = length(points)-1
 
         # Just annuli elements
-        F = FiniteContinuousZernike(N, points)
+        F = ContinuousZernike(N, points)
         fc = F \ f0.(axes(F,1))
         (θs, rs, vals) = finite_plotvalues(F, fc)
         vals_, err = inf_error(F, θs, rs, vals, f0)
@@ -65,7 +65,7 @@ end
         N = 50; points = [0.0; 0.5; 0.8; 1.0]
         K = length(points)-1
 
-        F = FiniteContinuousZernike(N, points)
+        F = ContinuousZernike(N, points)
         fc = F \ f0.(axes(F,1))
         (θs, rs, vals) = finite_plotvalues(F, fc)
         vals_, err = inf_error(F, θs, rs, vals, f0)
@@ -86,7 +86,7 @@ end
         N = 50; points = [0.0;1.0]
         K = length(points)-1
 
-        F = FiniteContinuousZernike(N, points)
+        F = ContinuousZernike(N, points)
         fc = F \ f0.(axes(F,1))
         (θs, rs, vals) = finite_plotvalues(F, fc)
         vals_, err = inf_error(F, θs, rs, vals, f0)
@@ -110,7 +110,7 @@ end
         K = length(points)-1
 
         # Just annuli elements
-        F = FiniteContinuousZernike(N, points)
+        F = ContinuousZernike(N, points)
         fc = F \ plane_wave.(axes(F,1))
         λ(r²) = sin(r²)
         M = F' * (λ.(axes(F,1)) .* F)
@@ -121,7 +121,7 @@ end
         @test sum(transpose.(fc) .* (M .* fc)) ≈  0.3040061959548193
 
         # disk + annulus element
-        F = FiniteContinuousZernike(N, [0.0;0.5;0.8])
+        F = ContinuousZernike(N, [0.0;0.5;0.8])
         fc = F \ plane_wave.(axes(F,1))
         M = F' * (λ.(axes(F,1)) .* F)
         @test length(M) == 2N-1
@@ -131,7 +131,7 @@ end
         @test sum(transpose.(fc) .* (M .* fc)) ≈  0.3055743848155512
 
         # just disk element
-        F = FiniteContinuousZernike(N, [0.0;0.8])
+        F = ContinuousZernike(N, [0.0;0.8])
         fc = F \ plane_wave.(axes(F,1))
         M = F' * (λ.(axes(F,1)) .* F)
         @test length(M) == 2N-1

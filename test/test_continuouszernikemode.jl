@@ -7,10 +7,10 @@ f1c(xy) = exp(-first(xy)^2-last(xy)^2) * sqrt(first(xy)^2+last(xy)^2)*cos(atan(l
 f1s(xy) = exp(-first(xy)^2-last(xy)^2) * sqrt(first(xy)^2+last(xy)^2)*sin(atan(last(xy), first(xy)))
 
 
-@testset "finiteannulusmode" begin
+@testset "annulusmode" begin
     @testset "basics" begin
-        N=10; F = FiniteContinuousZernikeMode(N, [0.5; 0.7; 1], 0, 1)
-        @test F isa FiniteContinuousZernikeMode
+        N=10; F = ContinuousZernikeMode(N, [0.5; 0.7; 1], 0, 1)
+        @test F isa ContinuousZernikeMode
         @test F.points == [0.5; 0.7; 1.0]
         @test F.m == 0
         @test F.j == 1
@@ -37,7 +37,7 @@ f1s(xy) = exp(-first(xy)^2-last(xy)^2) * sqrt(first(xy)^2+last(xy)^2)*sin(atan(l
         K = length(points)-1
 
         # Just annuli elements
-        F = FiniteContinuousZernikeMode(N, points, 0, 1)
+        F = ContinuousZernikeMode(N, points, 0, 1)
         fc = F \ f0.(axes(F,1))
         (uc, θs, rs, vals) = element_plotvalues(F*fc)
         vals_, err = inf_error(F, θs, rs, vals, f0)
@@ -49,7 +49,7 @@ f1s(xy) = exp(-first(xy)^2-last(xy)^2) * sqrt(first(xy)^2+last(xy)^2)*sin(atan(l
         @test fc' * (M * fc) ≈  π/2 * (exp(-2*0.2^2) - exp(-2))
         @test fc' * (Δ * fc) ≈  1.856554980031349
 
-        F = FiniteContinuousZernikeMode(N, points, 1, 0)
+        F = ContinuousZernikeMode(N, points, 1, 0)
         fc = F \ f1s.(axes(F,1))
         (uc, θs, rs, vals) = element_plotvalues(F*fc)
         vals_, err = inf_error(F, θs, rs, vals, f1s)
@@ -62,7 +62,7 @@ f1s(xy) = exp(-first(xy)^2-last(xy)^2) * sqrt(first(xy)^2+last(xy)^2)*sin(atan(l
         @test fc' * (Δ * fc) ≈ 0.816915357578546
 
         Memoization.empty_all_caches!()
-        F = FiniteContinuousZernikeMode(N, points, 6, 1)
+        F = ContinuousZernikeMode(N, points, 6, 1)
         fc = F \ f6.(axes(F,1))
         (uc, θs, rs, vals) = element_plotvalues(F*fc)
         vals_, err = inf_error(F, θs, rs, vals, f6)
@@ -78,7 +78,7 @@ f1s(xy) = exp(-first(xy)^2-last(xy)^2) * sqrt(first(xy)^2+last(xy)^2)*sin(atan(l
         N = 100; points = [0.0; 0.5; 0.8; 1.0]
         K = length(points)-1
 
-        F = FiniteContinuousZernikeMode(N, points, 0, 1)
+        F = ContinuousZernikeMode(N, points, 0, 1)
         fc = F \ f0.(axes(F,1))
         (uc, θs, rs, vals) = element_plotvalues(F*fc)
         vals_, err = inf_error(F, θs, rs, vals, f0)
@@ -90,7 +90,7 @@ f1s(xy) = exp(-first(xy)^2-last(xy)^2) * sqrt(first(xy)^2+last(xy)^2)*sin(atan(l
         @test fc' * (M * fc) ≈  π/2 * (1.0 - exp(-2))
         @test fc' * (Δ * fc) ≈ 1.866087658826886
 
-        F = FiniteContinuousZernikeMode(N, points, 1, 0)
+        F = ContinuousZernikeMode(N, points, 1, 0)
         fc = F \ f1s.(axes(F,1))
         (uc, θs, rs, vals) = element_plotvalues(F*fc)
         vals_, err = inf_error(F, θs, rs, vals, f1s)
@@ -103,7 +103,7 @@ f1s(xy) = exp(-first(xy)^2-last(xy)^2) * sqrt(first(xy)^2+last(xy)^2)*sin(atan(l
         @test fc' * (Δ * fc) ≈ 0.933043829413443
 
         Memoization.empty_all_caches!()
-        F = FiniteContinuousZernikeMode(N, points, 6, 1)
+        F = ContinuousZernikeMode(N, points, 6, 1)
         fc = F \ f6.(axes(F,1))
         (uc, θs, rs, vals) = element_plotvalues(F*fc)
         vals_, err = inf_error(F, θs, rs, vals, f6)
@@ -124,7 +124,7 @@ f1s(xy) = exp(-first(xy)^2-last(xy)^2) * sqrt(first(xy)^2+last(xy)^2)*sin(atan(l
         K = length(points)-1
 
         # Just annuli elements
-        F = FiniteContinuousZernikeMode(N, points, 0, 1)
+        F = ContinuousZernikeMode(N, points, 0, 1)
         fc = F \ f0.(axes(F,1))
         λ(r²) = r²
         M = F' * (λ.(axes(F,1)) .*F)
@@ -143,7 +143,7 @@ f1s(xy) = exp(-first(xy)^2-last(xy)^2) * sqrt(first(xy)^2+last(xy)^2)*sin(atan(l
         K = length(points)-1
 
         # Just disk + annulus element
-        F = FiniteContinuousZernikeMode(N, points, 0, 1)
+        F = ContinuousZernikeMode(N, points, 0, 1)
         fc = F \ f0.(axes(F,1))
         λ(r²) = r²
         M = F' * (λ.(axes(F,1)) .*F)

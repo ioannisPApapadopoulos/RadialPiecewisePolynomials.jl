@@ -44,7 +44,7 @@ end
         C = ContinuousZernikeAnnulusElementMode(points, 0, 1)
         fc = C \ f0.(axes(C,1))
 
-        Zs = FiniteZernikeBasis(100, points, 0, 0)
+        Zs = ZernikeBasis(100, points, 0, 0)
         Z = ZernikeBasisMode(points,0,0,0,1)
         fz = Zs \ f0.(axes(Zs,1))
         fz = fz[1]
@@ -53,10 +53,10 @@ end
     end
 end
 
-@testset "finitezernikebasismode" begin
+@testset "zernikebasismode" begin
     @testset "basics" begin
         N, points, a, b, m, j = 5, [0.1;0.3;1], 0, 0, 0, 1
-        Z = FiniteZernikeBasisMode(N, points, a, b, m, j)
+        Z = ZernikeBasisMode(N, points, a, b, m, j)
         @test Z.N == N
         @test Z.points == points
         @test Z.a == a
@@ -68,10 +68,10 @@ end
     @testset "L²-inner product" begin
         # annuli elements
         N, points, a, b, m, j = 50, [0.5;0.55;0.6], 0, 0, 0, 1
-        Z = FiniteZernikeBasisMode(N, points, a, b, m, j)
-        F = FiniteContinuousZernikeMode(N, points, m, j)
+        Z = ZernikeBasisMode(N, points, a, b, m, j)
+        F = ContinuousZernikeMode(N, points, m, j)
 
-        Zs = FiniteZernikeBasis(2N, points, 0, 0)
+        Zs = ZernikeBasis(2N, points, 0, 0)
         fz = Zs \ f0.(axes(Zs,1))
         fz = fz[1]
 
@@ -79,10 +79,10 @@ end
         @test fc' * (F' * Z) * fz ≈ 0.188147476644037
 
         N, points, a, b, m, j = 50, [0.2; 0.5; 0.8; 1.0], 0, 0, 1, 0
-        Z = FiniteZernikeBasisMode(N, points, a, b, m, j)
-        F = FiniteContinuousZernikeMode(N, points, m, j)
+        Z = ZernikeBasisMode(N, points, a, b, m, j)
+        F = ContinuousZernikeMode(N, points, m, j)
 
-        Zs = FiniteZernikeBasis(2N, points, 0, 0)
+        Zs = ZernikeBasis(2N, points, 0, 0)
         fz = Zs \ f1s.(axes(Zs,1))
         fz = fz[2]
 
@@ -91,10 +91,10 @@ end
 
         # disk & annuli elements
         N, points, a, b, m, j = 50, [0.0; 0.5; 0.8; 1.0], 0, 0, 0, 1
-        Z = FiniteZernikeBasisMode(N, points, a, b, m, j)
-        F = FiniteContinuousZernikeMode(N, points, m, j)
+        Z = ZernikeBasisMode(N, points, a, b, m, j)
+        F = ContinuousZernikeMode(N, points, m, j)
 
-        Zs = FiniteZernikeBasis(2N, points, 0, 0)
+        Zs = ZernikeBasis(2N, points, 0, 0)
         fz = Zs \ f0.(axes(Zs,1))
         fz = fz[1]
 
@@ -102,10 +102,10 @@ end
         @test fc' * (F' * Z) * fz ≈ π/2 * (1.0 - exp(-2))
 
         N, points, a, b, m, j = 50, [0.0; 0.5; 0.8; 1.0], 0, 0, 1, 0
-        Z = FiniteZernikeBasisMode(N, points, a, b, m, j)
-        F = FiniteContinuousZernikeMode(N, points, m, j)
+        Z = ZernikeBasisMode(N, points, a, b, m, j)
+        F = ContinuousZernikeMode(N, points, m, j)
 
-        Zs = FiniteZernikeBasis(2N, points, 0, 0)
+        Zs = ZernikeBasis(2N, points, 0, 0)
         fz = Zs \ f1s.(axes(Zs,1))
         fz = fz[2]
 
@@ -117,7 +117,7 @@ end
 @testset "zernikebasis" begin
     @testset "basics" begin
         N, points, a, b = 5, [0.1;0.3;1], 0, 0
-        Z = FiniteZernikeBasis(N, points, a, b)
+        Z = ZernikeBasis(N, points, a, b)
         @test Z.N == N
         @test Z.points == points
         @test Z.a == a
@@ -126,13 +126,13 @@ end
 
     @testset "L²-inner product" begin
         N, points, a, b = 50, [0.2; 0.5; 0.8; 1.0], 0, 0
-        Z = FiniteZernikeBasis(N, points, a, b)
-        F = FiniteContinuousZernike(N, points)
+        Z = ZernikeBasis(N, points, a, b)
+        F = ContinuousZernike(N, points)
 
         fz = Z \ u0.(axes(Z,1))
         fc = F \ u0.(axes(F,1))
 
-        (θs, rs, vals) = finite_plotvalues(Z, fz)
+        (θs, rs, vals) = _plotvalues(Z, fz)
         vals_, err = inf_error(Z, θs, rs, vals, u0)
         @test err < 1e-15
 

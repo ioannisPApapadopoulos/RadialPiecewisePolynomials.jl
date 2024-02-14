@@ -2,6 +2,6 @@ using Test, RadialPiecewisePolynomials
 
 include("test_diskelement.jl")
 include("test_annuluselement.jl")
-include("test_finiteannulusmode.jl")
-include("test_finiteannulus.jl")
-include("test_finitezernike.jl")
+include("test_continuouszernikemode.jl")
+include("test_continuouszernike.jl")
+include("test_zernikebasis.jl")
