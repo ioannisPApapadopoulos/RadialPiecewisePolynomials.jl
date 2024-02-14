@@ -130,9 +130,9 @@ end
 ###
 @simplify function *(A::QuasiAdjoint{<:Any,<:ContinuousZernike}, B::ContinuousZernike)
     @assert A' == B
-    gram_matrix(B)
+    mass_matrix(B)
 end
-function gram_matrix(A::ContinuousZernike)
+function mass_matrix(A::ContinuousZernike)
     Fs = A.Fs
     mass_matrix.(Fs)
 end

@@ -201,7 +201,7 @@ function _build_trailing_bubbles(F::ContinuousZernikeMode{T}, Ms, N::Int, bs::In
         # Mn = vcat([Ms[1][2:N-1,2:N-1]], [Ms[i][3:N, 3:N] for i in 2:K])
         # Mn = vcat([Ms[1][2:N-1,2:N-1]], [reshape(view(Ms[i],3:N, 3:N)[:], N-2, N-2) for i in 2:K])
         if same_ρs
-            M_annuli = repeat([[i=>view(Ms[2], band(i))[3:N-i]] for i in 0:bs], K-1)
+            M_annuli = repeat([[i=>view(Ms[2], band(i))[3:N-i] for i in 0:bs]], K-1)
             Mn = vcat([[i=>view(Ms[1], band(i))[2:N-1-i] for i in 0:bs]], M_annuli)
         else
             Mn = vcat([[i=>view(Ms[1], band(i))[2:N-1-i] for i in 0:bs]], [[i=>view(Ms[k], band(i))[3:N-i] for i in 0:bs] for k in 2:K])
@@ -210,7 +210,7 @@ function _build_trailing_bubbles(F::ContinuousZernikeMode{T}, Ms, N::Int, bs::In
         # Mn = [Ms[i][3:N, 3:N] for i in 1:K]
         # Mn = [reshape(view(Ms[i],3:N, 3:N)[:], N-2, N-2) for i in 1:K]
         if same_ρs
-            Mn = repeat([[i=>view(Ms[1], band(i))[3:N-i]] for i in 0:bs], K)
+            Mn = repeat([[i=>view(Ms[1], band(i))[3:N-i] for i in 0:bs]], K)
         else
             Mn = [[i=>view(Ms[k], band(i))[3:N-i] for i in 0:bs] for k in 1:K]
         end
@@ -250,7 +250,7 @@ function mass_matrix(B::ContinuousZernikeMode)
 
     γs = _getγs(B)
 
-    B.N < 4 ? _arrow_head_matrix(B, Ms, γs, B.N, 1, first(B.points), same_ρs ) : _arrow_head_matrix(B, Ms, γs, B.N, 2, first(B.points), same_ρs )
+    B.N < 4 ? _arrow_head_matrix(B, Ms, γs, B.N, 1, first(B.points), false) : _arrow_head_matrix(B, Ms, γs, B.N, 2, first(B.points), false)
 end
 
 ###

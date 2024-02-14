@@ -22,6 +22,12 @@ end
         @test F isa ContinuousZernike
         @test F.points == [0.5; 0.7; 1.0]
         @test F.N == N
+        @test F.Fs[1].same_ρs == false
+
+        s = 0.5^(-1/2)
+        equi_points = [0.0; reverse([s^(-j) for j in 0:2])]
+        F = ContinuousZernike(N, equi_points)
+        @test F.Fs[1].same_ρs == true
     end
 
     # @testset "continuity" begin

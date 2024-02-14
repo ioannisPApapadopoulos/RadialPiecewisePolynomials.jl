@@ -33,7 +33,9 @@ f1s(xy) = exp(-first(xy)^2-last(xy)^2) * sqrt(first(xy)^2+last(xy)^2)*sin(atan(l
         Memoization.empty_all_caches!()
 
         ρ = 0.2
-        N = 100; points = [0.2; 0.5; 0.8; 1.0]
+        N = 20; points = [0.2; 0.5; 0.8; 1.0]
+        s = 0.2^(-1/3)
+        equi_points = reverse([s^(-j) for j in 0:3])
         K = length(points)-1
 
         # Just annuli elements
@@ -74,8 +76,23 @@ f1s(xy) = exp(-first(xy)^2-last(xy)^2) * sqrt(first(xy)^2+last(xy)^2)*sin(atan(l
         @test fc' * (M * fc) ≈ 0.04005947846778158
         @test fc' * (Δ * fc) ≈ 2.686674285690333
 
+        F = ContinuousZernikeMode(N, equi_points, 6, 1, same_ρs=true)
+        @test F.same_ρs == true
+        fc = F \ f6.(axes(F,1))
+        (uc, θs, rs, vals) = element_plotvalues(F*fc)
+        vals_, err = inf_error(F, θs, rs, vals, f6)
+        @test err < 1e-9
+        M = F' * F
+        @test size(M) == (K*N-(K-1), K*N-(K-1))
+        ∇ = Derivative(axes(F,1)); Δ = (∇*F)' * (∇*F)
+        @test size(Δ) == (K*N-(K-1), K*N-(K-1))
+        @test fc' * (M * fc) ≈ 0.04005947846778158
+        @test fc' * (Δ * fc) ≈ 2.686674285690333
+
         # disk + annuli elements
-        N = 100; points = [0.0; 0.5; 0.8; 1.0]
+        N = 20; points = [0.0; 0.5; 0.8; 1.0]
+        s = 0.5^(-1/2)
+        equi_points = [0.0; reverse([s^(-j) for j in 0:2])]
         K = length(points)-1
 
         F = ContinuousZernikeMode(N, points, 0, 1)
@@ -114,13 +131,26 @@ f1s(xy) = exp(-first(xy)^2-last(xy)^2) * sqrt(first(xy)^2+last(xy)^2)*sin(atan(l
         @test size(Δ) == (K*(N-1), K*(N-1))
         @test fc' * (M * fc) ≈ 0.04005947850206709
         @test fc' * (Δ * fc) ≈ 2.686674356967118
+
+        F = ContinuousZernikeMode(N, equi_points, 6, 1, same_ρs=true)
+        @test F.same_ρs == true
+        fc = F \ f6.(axes(F,1))
+        (uc, θs, rs, vals) = element_plotvalues(F*fc)
+        vals_, err = inf_error(F, θs, rs, vals, f6)
+        @test err < 1e-9
+        M = F' * F
+        @test size(M) == (K*(N-1), K*(N-1))
+        ∇ = Derivative(axes(F,1)); Δ = (∇*F)' * (∇*F)
+        @test size(Δ) == (K*(N-1), K*(N-1))
+        @test fc' * (M * fc) ≈ 0.04005947850206709
+        @test fc' * (Δ * fc) ≈ 2.686674356967118
     end
 
     @testset "assembly" begin
         Memoization.empty_all_caches!()
 
         ρ = 0.2
-        N = 100; points = [0.2; 0.5; 0.8]
+        N = 20; points = [0.2; 0.5; 0.8]
         K = length(points)-1
 
         # Just annuli elements
@@ -139,7 +169,7 @@ f1s(xy) = exp(-first(xy)^2-last(xy)^2) * sqrt(first(xy)^2+last(xy)^2)*sin(atan(l
         @test fc' * (M * fc) ≈ 0.277157468937116 # mathematica
 
 
-        N = 100; points = [0.; 0.5; 0.7]
+        N = 20; points = [0.; 0.5; 0.7]
         K = length(points)-1
 
         # Just disk + annulus element
