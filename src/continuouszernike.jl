@@ -108,9 +108,10 @@ function _getFs(N::Int, points::AbstractVector{T}) where T
         D = NTuple{K+1-κ, AbstractMatrix}([Ds[i][m+1] for i in 1:K+1-κ])
 
         normalize_constants = Vector{T}[T[cst[k][i][m+1] for k in 1:lastindex(cst)] for i in 1:K+1-κ]
+        Cs = Tuple(_getCs(points, m, j, N, R, D, normalize_constants, same_ρs))
 
         # Construct the structs for each Fourier mode seperately
-        append!(Fs, [ContinuousZernikeMode(M, points, m, j, R, D, normalize_constants, same_ρs, N)])
+        append!(Fs, [ContinuousZernikeMode(M, points, m, j, Cs, normalize_constants, same_ρs, N)])
     end
     return Fs
 end
@@ -129,7 +130,10 @@ end
 ###
 @simplify function *(A::QuasiAdjoint{<:Any,<:ContinuousZernike}, B::ContinuousZernike)
     @assert A' == B
-    Fs = B.Fs
+    gram_matrix(B)
+end
+function gram_matrix(A::ContinuousZernike)
+    Fs = A.Fs
     mass_matrix.(Fs)
 end
 
@@ -201,9 +205,13 @@ end
     @assert A' == B
     # points = T.(B.Φ.points);
     # N = B.Φ.N;
+    stiffness_matrix(B)
+end
+function stiffness_matrix(B::GradientContinuousZernike)
     Fs = B.Φ.Fs
     stiffness_matrix.(Fs)
 end
+
 
 # function zero_dirichlet_bcs!(Φ::ContinuousZernike{T}, Δ::AbstractVector{<:LinearAlgebra.Symmetric{T,<:BBBArrowheadMatrix{T}}}) where T
 #     @assert length(Δ) == 2*Φ.N-1
@@ -291,7 +299,7 @@ function _bubble2disk_or_ann_all_modes(Φ::ContinuousZernike, us::AbstractVector
             end
         else
             for (Fm, i) in zip(Fs, 1:2N-1)
-                C = _getCs(Fm)[k]
+                C = Fm.Cs[k] #_getCs(Fm)[k]
                 Ũs[1:Ms[i],i,k] = bubble2ann(C, Us[1:Ms[i],i,k])
             end
         end

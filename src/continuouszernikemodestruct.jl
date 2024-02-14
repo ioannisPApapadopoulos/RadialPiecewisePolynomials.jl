@@ -6,8 +6,7 @@ struct ContinuousZernikeMode{T} <: Basis{T}
     points::AbstractVector{T}
     m::Int
     j::Int
-    R::Tuple{Vararg{AbstractMatrix{T}}}
-    D::Tuple{Vararg{AbstractMatrix{T}}}
+    Cs::Tuple{Vararg{Basis}}
     normalize_constants::AbstractVector{<:AbstractVector{<:T}}
     same_ρs::Bool
     b::Int # Should remove once adaptive expansion has been figured out.

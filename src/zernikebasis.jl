@@ -274,7 +274,7 @@ function gram_matrix(F::ContinuousZernikeMode, Ψ::ZernikeBasisMode)
 
     N, points, m = Ψ.N, T.(Ψ.points), Ψ.m
     K = length(points)-1
-    Cs = _getCs(F)
+    Cs = F.Cs # _getCs(F)
     Zs = _getZs(Ψ)
     γs = _getγs(F)
     Ms = [gram_matrix(C, Z̃) for (C, Z̃) in zip(Cs, Zs)]

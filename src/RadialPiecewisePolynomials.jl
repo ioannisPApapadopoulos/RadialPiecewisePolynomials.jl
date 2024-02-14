@@ -25,7 +25,7 @@ export SVector, Zeros, Ones, Vcat, Derivative, pad, paddeddata, Hcat, RadialCoor
         zero_dirichlet_bcs!, element_plotvalues,
         finite_plotvalues, inf_error, plot,
         ContinuousZernikeMode, ContinuousZernike, inf_error,
-        ZernikeBasis, ZernikeBasisMode, ZernikeBasisMode,
+        ZernikeBasis, ZernikeBasisMode, ZernikeBasisModeElement,
         BBBArrowheadMatrix,
         get_rs, get_θs, getNs,
         mass_matrix, assembly_matrix, stiffness_matrix, gram_matrix, piecewise_constant_assembly_matrix
