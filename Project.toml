@@ -25,7 +25,7 @@ SpecialFunctions = "276daf66-3868-5448-9aa4-cd146d93841b"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 
 [compat]
-AnnuliOrthogonalPolynomials = "0.0.3"
+AnnuliOrthogonalPolynomials = "0.0.4"
 BandedMatrices = "0.17, 1"
 BlockArrays = "0.16"
 BlockBandedMatrices = "0.12"
