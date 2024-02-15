@@ -25,7 +25,7 @@ x = axes(F,1)
 
 fz = Z \ rhs_xy.(x)
 
-(θs, rs, vals) = _plotvalues(Z, fz)
+(θs, rs, vals) = finite_plotvalues(Z, fz)
 vals_, err = inf_error(Z, θs, rs, vals, rhs_xy) # Check inf-norm errors on the grid
 err
 plot(Z, θs, rs, vals)
@@ -42,7 +42,7 @@ zero_dirichlet_bcs!(F, Mf) # bcs
 # Solve over each Fourier mode seperately
 u = Δ .\ Mf
 
-(θs, rs, vals) = _plotvalues(F, u, N=200)
+(θs, rs, vals) = finite_plotvalues(F, u, N=200)
 vals_, err = inf_error(F, θs, rs, vals, ua_xy) # Check inf-norm errors on the grid
 err
 plot(F, θs, rs, vals) # plot
