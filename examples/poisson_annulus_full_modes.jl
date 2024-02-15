@@ -20,12 +20,12 @@ end
 
 ρ = 0.2
 points = [ρ;0.3;0.5;0.8;1.0]; K = length(points)-1
-N=40; F = FiniteContinuousZernike(N, points); Z = FiniteZernikeBasis(N, points, 0, 0)
+N=40; F = ContinuousZernike(N, points); Z = ZernikeBasis(N, points, 0, 0)
 
 x = axes(Z,1)
 
 fz = Z \ rhs_xy.(x)
-(θs, rs, vals) = finite_plotvalues(Z, fz)
+(θs, rs, vals) = _plotvalues(Z, fz)
 vals_, err = inf_error(Z, θs, rs, vals, rhs_xy) # Check inf-norm errors on the grid
 err
 plot(Z, θs, rs, vals)
@@ -42,7 +42,7 @@ zero_dirichlet_bcs!(F, Mf) # bcs
 # Solve over each Fourier mode seperately
 u = Δ .\ Mf
 
-(θs, rs, vals) = finite_plotvalues(F, u)
+(θs, rs, vals) = _plotvalues(F, u)
 vals_, err = inf_error(F, θs, rs, vals, ua_xy) # Check inf-norm errors on the grid
 err
 plot(F, θs, rs, vals) # plot

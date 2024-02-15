@@ -24,8 +24,8 @@ export SVector, Zeros, Ones, Vcat, Derivative, pad, paddeddata, Hcat, RadialCoor
         ContinuousZernikeAnnulusMode,
         zero_dirichlet_bcs!, element_plotvalues,
         finite_plotvalues, inf_error, plot,
-        FiniteContinuousZernikeMode, FiniteContinuousZernike, inf_error,
-        FiniteZernikeBasis, ZernikeBasisMode, FiniteZernikeBasisMode,
+        ContinuousZernikeMode, ContinuousZernike, inf_error,
+        ZernikeBasis, ZernikeBasisMode, ZernikeBasisModeElement,
         BBBArrowheadMatrix,
         get_rs, get_θs, getNs,
         mass_matrix, assembly_matrix, stiffness_matrix, gram_matrix, piecewise_constant_assembly_matrix
@@ -41,9 +41,10 @@ end
 
 include("diskelement.jl")
 include("annuluselement.jl")
-include("finitecontinuousmode.jl")
-include("finitecontinuous.jl")
-include("finitezernike.jl")
+include("continuouszernikemodestruct.jl")
+include("continuouszernikemode.jl")
+include("continuouszernike.jl")
+include("zernikebasis.jl")
 
 
 end # module

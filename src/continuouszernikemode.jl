@@ -1,26 +1,13 @@
-struct FiniteContinuousZernikeMode{T} <: Basis{T}
-    N::Int
-    points::AbstractVector{T}
-    m::Int
-    j::Int
-    R::Tuple{Vararg{AbstractMatrix{T}}}
-    D::Tuple{Vararg{AbstractMatrix{T}}}
-    normalize_constants::AbstractVector{<:AbstractVector{<:T}}
-    same_ρs::Bool
-    b::Int # Should remove once adaptive expansion has been figured out.
-end
-
-function FiniteContinuousZernikeMode(N::Int, points::AbstractVector{T}, m::Int, j::Int, R, D, normalize_constants::AbstractVector{<:AbstractVector{<:T}}; same_ρs::Bool) where T
+function ContinuousZernikeMode(N::Int, points::AbstractVector{T}, m::Int, j::Int, Cs, normalize_constants::AbstractVector{<:AbstractVector{<:T}}; same_ρs::Bool) where T
     @assert points == sort(points)
     @assert m ≥ 0
     @assert m == 0 ? j == 1 : 0 ≤ j ≤ 1
     K = first(points) ≈ 0 ? length(points)-2 : length(points) - 1
-    @assert length(R) == length(D) == (same_ρs ? 1 : K)
     # @assert length(normalize_constants) ≥ 2
-    FiniteContinuousZernikeMode{T}(N, points, m, j, R, D, normalize_constants, same_ρs, m+2N)
+    ContinuousZernikeMode{T}(N, points, m, j, Cs, normalize_constants, same_ρs, m+2N)
 end
 
-function FiniteContinuousZernikeMode(N::Int, points::AbstractVector{T}, m::Int, j::Int; same_ρs::Bool=false) where {T}
+function ContinuousZernikeMode(N::Int, points::AbstractVector{T}, m::Int, j::Int; same_ρs::Bool=false) where {T}
     K = length(points)-1
     κ = first(points[1]) ≈ 0 ? 2 : 1
     ρs = []
@@ -36,20 +23,21 @@ function FiniteContinuousZernikeMode(N::Int, points::AbstractVector{T}, m::Int, 
     Z = ZernikeAnnulus{T}.(ρs,1,1)
     D = (Z .\ (Laplacian.(axes.(Z,1)).*Weighted.(Z)))
     D = NTuple{K+1-κ, AbstractMatrix}([Ds.ops[m+1] for Ds in D])
-
-    FiniteContinuousZernikeMode(N, points, m, j, R, D, normalize_constants, same_ρs=same_ρs)
+    
+    Cs = Tuple(_getCs(points, m, j, m+2N, R, D, normalize_constants, same_ρs))
+    ContinuousZernikeMode(N, points, m, j, Cs, normalize_constants, same_ρs=same_ρs)
 end
 
-function axes(Z::FiniteContinuousZernikeMode{T}) where T
+function axes(Z::ContinuousZernikeMode{T}) where T
     first(Z.points) ≈ 0 && return (Inclusion(last(Z.points)*UnitDisk{T}()), blockedrange(Vcat(length(Z.points)-1, Fill(length(Z.points) - 1, Z.N-2))))
     # (Inclusion(annulus(first(Z.points), last(Z.points))), oneto(Z.N*(length(Z.points)-1)-(length(Z.points)-2)))
     (Inclusion(annulus(first(Z.points), last(Z.points))), blockedrange(Vcat(length(Z.points), Fill(length(Z.points) - 1, Z.N-2))))
 end
-==(P::FiniteContinuousZernikeMode, Q::FiniteContinuousZernikeMode) = P.points == Q.points && P.m == Q.m && P.j == Q.j && P.b == Q.b
+==(P::ContinuousZernikeMode, Q::ContinuousZernikeMode) = P.points == Q.points && P.m == Q.m && P.j == Q.j && P.b == Q.b
 
-function show(io::IO, F::FiniteContinuousZernikeMode)
+function show(io::IO, F::ContinuousZernikeMode)
     N, points, m, j = F.N, F.points, F.m, F.j
-    print(io, "FiniteContinuousZernikeMode: N=$N, points=$points, m=$m, j=$j.")
+    print(io, "ContinuousZernikeMode: N=$N, points=$points, m=$m, j=$j.")
 end
 
 function _getCs(points::AbstractVector{T}, m::Int, j::Int, b::Int, R, D, normalize_constants, same_ρs::Bool) where T
@@ -63,11 +51,11 @@ function _getCs(points::AbstractVector{T}, m::Int, j::Int, b::Int, R, D, normali
     end
 end
 
-function _getCs(F::FiniteContinuousZernikeMode)
-    points, m, j, b = F.points, F.m, F.j, F.b
-    R, D, normalize_constants, same_ρs = F.R, F.D, F.normalize_constants, F.same_ρs
-    _getCs(points, m, j, b, R, D, normalize_constants, same_ρs)
-end
+# function _getCs(F::ContinuousZernikeMode)
+#     points, m, j, b = F.points, F.m, F.j, F.b
+#     R, D, normalize_constants, same_ρs = F.R, F.D, F.normalize_constants, F.same_ρs
+#     _getCs(points, m, j, b, R, D, normalize_constants, same_ρs)
+# end
 
 function _getγs(points::AbstractArray{T}, m::Int) where T
     K = length(points)-1
@@ -76,9 +64,9 @@ function _getγs(points::AbstractArray{T}, m::Int) where T
     γ = [(one(T)-(points[k+1]/points[k+2])^2)*(points[k+1]/points[k+2])^m / (one(T)-(points[k]/points[k+1])^2) for k in 2:K-1]
     return append!([(one(T)-(points[2]/points[3])^2)*(points[2]/points[3])^m / (sqrt(convert(T,2)^(m+2-iszero(m))/π) * normalizedjacobip(0, 0, m, 1.0))],γ)
 end
-_getγs(F::FiniteContinuousZernikeMode{T}) where T = _getγs(F.points, F.m)
+_getγs(F::ContinuousZernikeMode{T}) where T = _getγs(F.points, F.m)
 
-# function getindex(F::FiniteContinuousZernikeMode{T}, xy::StaticVector{2}, j::Int)::T where {T}
+# function getindex(F::ContinuousZernikeMode{T}, xy::StaticVector{2}, j::Int)::T where {T}
 #     points = T.(F.points); K = length(points)-1
 #     N = F.N; m = F.m; j = F.j;
 #     Cs = _getCs(points, m, j, F.b)
@@ -100,10 +88,10 @@ _getγs(F::FiniteContinuousZernikeMode{T}) where T = _getγs(F.points, F.m)
 # end
 
 
-function ldiv(F::FiniteContinuousZernikeMode{T}, f::AbstractQuasiVector) where T
+function ldiv(F::ContinuousZernikeMode{T}, f::AbstractQuasiVector) where T
     N = F.N
     points = T.(F.points); K = length(points)-1
-    Cs = _getCs(F)
+    Cs = F.Cs #_getCs(F)
     fs = [C \ f.f.(axes(C, 1)) for C in Cs]
 
     bubbles = zeros(T, N-2, K)
@@ -129,7 +117,7 @@ end
 ###
 
 # Interaction of hats with themselves and other hats
-function _build_top_left_block(F::FiniteContinuousZernikeMode{T}, Ms, γs::AbstractArray{T}, p::T) where T
+function _build_top_left_block(F::ContinuousZernikeMode{T}, Ms, γs::AbstractArray{T}, p::T) where T
     K = length(Ms)
     if p ≈ 0
         if K > 1
@@ -172,7 +160,7 @@ function _build_top_left_block(F::FiniteContinuousZernikeMode{T}, Ms, γs::Abstr
 end
 
 # Interaction of the hats with the bubbles
-function _build_second_block(F::FiniteContinuousZernikeMode{T}, Ms, γs::AbstractArray{T}, bs::Int, p::T) where T
+function _build_second_block(F::ContinuousZernikeMode{T}, Ms, γs::AbstractArray{T}, bs::Int, p::T) where T
     K = length(Ms)
     γs = vcat(γs, one(T))
     dv, ev = [], []
@@ -207,38 +195,47 @@ function _build_second_block(F::FiniteContinuousZernikeMode{T}, Ms, γs::Abstrac
 end
 
 # Interaction of the bubbles with themselves and other bubbles
-function _build_trailing_bubbles(F::FiniteContinuousZernikeMode{T}, Ms, N::Int, bs::Int, p::T) where T
+function _build_trailing_bubbles(F::ContinuousZernikeMode{T}, Ms, N::Int, bs::Int, p::T, same_ρs::Bool) where T
     K = length(Ms)
     if p ≈ 0
         # Mn = vcat([Ms[1][2:N-1,2:N-1]], [Ms[i][3:N, 3:N] for i in 2:K])
         # Mn = vcat([Ms[1][2:N-1,2:N-1]], [reshape(view(Ms[i],3:N, 3:N)[:], N-2, N-2) for i in 2:K])
-        Mn = vcat([[i=>view(Ms[1], band(i))[2:N-1-i] for i in 0:bs]], [[i=>view(Ms[k], band(i))[3:N-i] for i in 0:bs] for k in 2:K])
+        if same_ρs
+            M_annuli = repeat([[i=>view(Ms[2], band(i))[3:N-i] for i in 0:bs]], K-1)
+            Mn = vcat([[i=>view(Ms[1], band(i))[2:N-1-i] for i in 0:bs]], M_annuli)
+        else
+            Mn = vcat([[i=>view(Ms[1], band(i))[2:N-1-i] for i in 0:bs]], [[i=>view(Ms[k], band(i))[3:N-i] for i in 0:bs] for k in 2:K])
+        end
     else
         # Mn = [Ms[i][3:N, 3:N] for i in 1:K]
         # Mn = [reshape(view(Ms[i],3:N, 3:N)[:], N-2, N-2) for i in 1:K]
-        Mn = [[i=>view(Ms[k], band(i))[3:N-i] for i in 0:bs] for k in 1:K]
+        if same_ρs
+            Mn = repeat([[i=>view(Ms[1], band(i))[3:N-i] for i in 0:bs]], K)
+        else
+            Mn = [[i=>view(Ms[k], band(i))[3:N-i] for i in 0:bs] for k in 1:K]
+        end
     end
     # return [Symmetric(BandedMatrix{T}([i=>view(M, band(i))[:] for i in 0:bs]...)) for M in Mn]
     return [Symmetric(BandedMatrix{T}(M...)) for M in Mn]
 end
 
-function _arrow_head_matrix(F::FiniteContinuousZernikeMode, Ms, γs::AbstractArray{T}, N::Int, bs::Int, p::T) where T
+function _arrow_head_matrix(F::ContinuousZernikeMode, Ms, γs::AbstractArray{T}, N::Int, bs::Int, p::T, same_ρs::Bool) where T
     A = _build_top_left_block(F,Ms, γs, p)
     B = _build_second_block(F,Ms, γs, bs, p)
-    D = _build_trailing_bubbles(F,Ms, N, bs, p)
+    D = _build_trailing_bubbles(F,Ms, N, bs, p, same_ρs)
     Symmetric(BBBArrowheadMatrix{T}(A, B, (), D))
 end
 
 
-@simplify function *(A::QuasiAdjoint{<:Any,<:FiniteContinuousZernikeMode}, B::FiniteContinuousZernikeMode)
+@simplify function *(A::QuasiAdjoint{<:Any,<:ContinuousZernikeMode}, B::ContinuousZernikeMode)
     @assert A' == B
     mass_matrix(B)
 end
 
-function mass_matrix(B::FiniteContinuousZernikeMode)
-    Cs = _getCs(B)
-
-    if B.same_ρs
+function mass_matrix(B::ContinuousZernikeMode)
+    Cs = B.Cs #_getCs(B)
+    same_ρs = B.same_ρs
+    if same_ρs
         if first(B.points) ≈ 0
             Md = mass_matrix(Cs[1])
             M = mass_matrix(Cs[2])
@@ -253,13 +250,13 @@ function mass_matrix(B::FiniteContinuousZernikeMode)
 
     γs = _getγs(B)
 
-    B.N < 4 ? _arrow_head_matrix(B, Ms, γs, B.N, 1, first(B.points)) : _arrow_head_matrix(B, Ms, γs, B.N, 2, first(B.points))
+    B.N < 4 ? _arrow_head_matrix(B, Ms, γs, B.N, 1, first(B.points), false) : _arrow_head_matrix(B, Ms, γs, B.N, 2, first(B.points), false)
 end
 
 ###
 # Assembly
 ###
-@simplify function *(A::QuasiAdjoint{<:Any,<:FiniteContinuousZernikeMode}, B::BroadcastQuasiMatrix{<:Any, typeof(*), <:Tuple{BroadcastQuasiVector, FiniteContinuousZernikeMode}})
+@simplify function *(A::QuasiAdjoint{<:Any,<:ContinuousZernikeMode}, B::BroadcastQuasiMatrix{<:Any, typeof(*), <:Tuple{BroadcastQuasiVector, ContinuousZernikeMode}})
     λ, F = B.args
     T = promote_type(eltype(A), eltype(F))
     @assert A' == F
@@ -286,9 +283,9 @@ end
 
     assembly_matrix(F, Λs)
 end
-function assembly_matrix(F::FiniteContinuousZernikeMode, Λs::Vector{<:AbstractMatrix})
+function assembly_matrix(F::ContinuousZernikeMode, Λs::Vector{<:AbstractMatrix})
     T = eltype(F)
-    Cs = _getCs(F)
+    Cs = F.Cs #_getCs(F)
     Ms = [assembly_matrix(C, Λ) for (C, Λ) in zip(Cs, Λs)]
 
     # figure out necessary bandwidth
@@ -300,36 +297,36 @@ function assembly_matrix(F::FiniteContinuousZernikeMode, Λs::Vector{<:AbstractM
         bs = min(N-2, maximum([last(colsupport(view(Ms[i], :, 1)[:]))-2 for i in 1:lastindex(Ms)]))
     end
     γs = _getγs(F)
-    _arrow_head_matrix(F, Ms, γs, N, bs, first(F.points))
+    _arrow_head_matrix(F, Ms, γs, N, bs, first(F.points), false)
 end
 
 ###
 # Gradient for constructing weak Laplacian.
 ###
 
-struct GradientFiniteContinuousZernikeAnnulusMode{T}<:Basis{T}
-    F::FiniteContinuousZernikeMode{T}
+struct GradientContinuousZernikeAnnulusMode{T}<:Basis{T}
+    F::ContinuousZernikeMode{T}
 end
 
-# GradientFiniteContinuousZernikeAnnulusMode(F::FiniteContinuousZernikeMode{T}) where T =  GradientFiniteContinuousZernikeAnnulusMode{T}(F)
+# GradientContinuousZernikeAnnulusMode(F::ContinuousZernikeMode{T}) where T =  GradientContinuousZernikeAnnulusMode{T}(F)
 
-axes(Z:: GradientFiniteContinuousZernikeAnnulusMode) = axes(Z.F)
-==(P::GradientFiniteContinuousZernikeAnnulusMode, Q::GradientFiniteContinuousZernikeAnnulusMode) = P.F == Q.F
+axes(Z:: GradientContinuousZernikeAnnulusMode) = axes(Z.F)
+==(P::GradientContinuousZernikeAnnulusMode, Q::GradientContinuousZernikeAnnulusMode) = P.F == Q.F
 
-@simplify function *(D::Derivative, F::FiniteContinuousZernikeMode)
-    GradientFiniteContinuousZernikeAnnulusMode(F)
+@simplify function *(D::Derivative, F::ContinuousZernikeMode)
+    GradientContinuousZernikeAnnulusMode(F)
 end
 
-@simplify function *(A::QuasiAdjoint{<:Any,<:GradientFiniteContinuousZernikeAnnulusMode}, B::GradientFiniteContinuousZernikeAnnulusMode)
+@simplify function *(A::QuasiAdjoint{<:Any,<:GradientContinuousZernikeAnnulusMode}, B::GradientContinuousZernikeAnnulusMode)
     @assert A' == B
     stiffness_matrix(B.F)
 end
-function stiffness_matrix(F::FiniteContinuousZernikeMode)
+function stiffness_matrix(F::ContinuousZernikeMode)
 
     N = F.N
-    Cs = _getCs(F)
-
-    if F.same_ρs
+    Cs = F.Cs #_getCs(F)
+    same_ρs = F.same_ρs 
+    if same_ρs
         if first(F.points) ≈ 0
             Δ = stiffness_matrix(Cs[2])
             Δs = [Δ for i in 1:length(F.points)-2]
@@ -344,10 +341,10 @@ function stiffness_matrix(F::FiniteContinuousZernikeMode)
 
     γs = _getγs(F)
 
-    _arrow_head_matrix(F, Δs, γs, N, 1, first(F.points))
+    _arrow_head_matrix(F, Δs, γs, N, 1, first(F.points), same_ρs)
 end
 
-function zero_dirichlet_bcs!(F::FiniteContinuousZernikeMode{T}, Δ::LinearAlgebra.Symmetric{T,<:AbstractMatrix{T}}) where T
+function zero_dirichlet_bcs!(F::ContinuousZernikeMode{T}, Δ::LinearAlgebra.Symmetric{T,<:AbstractMatrix{T}}) where T
     points = F.points
     A, B = Δ.data.A.data, Δ.data.B[1]
 
@@ -362,7 +359,7 @@ function zero_dirichlet_bcs!(F::FiniteContinuousZernikeMode{T}, Δ::LinearAlgebr
     end
 end
 
-function zero_dirichlet_bcs!(F::FiniteContinuousZernikeMode{T}, A::Matrix) where T
+function zero_dirichlet_bcs!(F::ContinuousZernikeMode{T}, A::Matrix) where T
     points = F.points
     K = length(points)-1
     if first(points) > 0
@@ -375,7 +372,7 @@ function zero_dirichlet_bcs!(F::FiniteContinuousZernikeMode{T}, A::Matrix) where
     end
 end
 
-function zero_dirichlet_bcs!(F::FiniteContinuousZernikeMode{T}, Mf::PseudoBlockVector) where T
+function zero_dirichlet_bcs!(F::ContinuousZernikeMode{T}, Mf::PseudoBlockVector) where T
     points = F.points
     K = length(points)-1
     if !(first(points) ≈  0)
@@ -390,11 +387,11 @@ end
 # Plotting
 ###
 
-function element_plotvalues(u::ApplyQuasiVector{T,typeof(*),<:Tuple{FiniteContinuousZernikeMode, AbstractVector}}) where T
+function element_plotvalues(u::ApplyQuasiVector{T,typeof(*),<:Tuple{ContinuousZernikeMode, AbstractVector}}) where T
     C, u = u.args 
     points = T.(C.points); K = length(points)-1
     N = C.N; m = C.m; j = C.j
-    Cs = _getCs(C)
+    Cs = C.Cs #_getCs(C)
 
     γs = _getγs(points, m)
     append!(γs, one(T))
@@ -418,7 +415,7 @@ function element_plotvalues(u::ApplyQuasiVector{T,typeof(*),<:Tuple{FiniteContin
 end
 
 ### Error collection
-function inf_error(F::FiniteContinuousZernikeMode{T}, θs::AbstractVector, rs::AbstractVector, vals::AbstractVector, u::Function) where T
+function inf_error(F::ContinuousZernikeMode{T}, θs::AbstractVector, rs::AbstractVector, vals::AbstractVector, u::Function) where T
     K = lastindex(F.points)-1
     _inf_error(K, θs, rs, vals, u)
 end

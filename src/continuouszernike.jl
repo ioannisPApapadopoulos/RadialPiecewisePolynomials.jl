@@ -1,26 +1,26 @@
-struct FiniteContinuousZernike{T, N<:Int, P<:AbstractVector} <: Basis{T}
+struct ContinuousZernike{T, N<:Int, P<:AbstractVector} <: Basis{T}
     N::N
     points::P
-    Fs::Tuple{Vararg{FiniteContinuousZernikeMode}}
+    Fs::Tuple{Vararg{ContinuousZernikeMode}}
 end
 
-function FiniteContinuousZernike{T}(N::Int, points::AbstractVector, Fs::Tuple{Vararg{FiniteContinuousZernikeMode}}) where {T}
+function ContinuousZernike{T}(N::Int, points::AbstractVector, Fs::Tuple{Vararg{ContinuousZernikeMode}}) where {T}
     @assert length(points) > 1 && points == sort(points)
     @assert length(Fs) == 2N-1
-    FiniteContinuousZernike{T, Int, typeof(points)}(N, points, Fs)
+    ContinuousZernike{T, Int, typeof(points)}(N, points, Fs)
 end
-FiniteContinuousZernike(N::Int, points::AbstractVector) = FiniteContinuousZernike{Float64}(N, points, Tuple(_getFs(N, points)))
+ContinuousZernike(N::Int, points::AbstractVector) = ContinuousZernike{Float64}(N, points, Tuple(_getFs(N, points)))
 
-function axes(Z::FiniteContinuousZernike{T}) where T
+function axes(Z::ContinuousZernike{T}) where T
     first(Z.points) ≈ 0 && return (Inclusion(last(Z.points)*UnitDisk{T}()), blockedrange(Vcat(length(Z.points)-1, Fill(length(Z.points) - 1, Z.N-2))))
     # (Inclusion(annulus(first(Z.points), last(Z.points))), oneto(Z.N*(length(Z.points)-1)-(length(Z.points)-2)))
     (Inclusion(annulus(first(Z.points), last(Z.points))), blockedrange(Vcat(length(Z.points), Fill(length(Z.points) - 1, Z.N-2))))
 end
-==(P::FiniteContinuousZernike, Q::FiniteContinuousZernike) = P.N == Q.N && P.points == Q.points
+==(P::ContinuousZernike, Q::ContinuousZernike) = P.N == Q.N && P.points == Q.points
 
-function show(io::IO, Φ::FiniteContinuousZernike)
+function show(io::IO, Φ::ContinuousZernike)
     N, points = Φ.N, Φ.points
-    print(io, "FiniteContinuousZernike at degree N=$N and endpoints $points.")
+    print(io, "ContinuousZernike at degree N=$N and endpoints $points.")
 end
 
 # Matrices for lowering to ZernikeAnnulus(0,0) via
@@ -108,17 +108,18 @@ function _getFs(N::Int, points::AbstractVector{T}) where T
         D = NTuple{K+1-κ, AbstractMatrix}([Ds[i][m+1] for i in 1:K+1-κ])
 
         normalize_constants = Vector{T}[T[cst[k][i][m+1] for k in 1:lastindex(cst)] for i in 1:K+1-κ]
+        Cs = Tuple(_getCs(points, m, j, N, R, D, normalize_constants, same_ρs))
 
         # Construct the structs for each Fourier mode seperately
-        append!(Fs, [FiniteContinuousZernikeMode(M, points, m, j, R, D, normalize_constants, same_ρs, N)])
+        append!(Fs, [ContinuousZernikeMode(M, points, m, j, Cs, normalize_constants, same_ρs, N)])
     end
     return Fs
 end
 
-_getFs(Φ::FiniteContinuousZernike{T}) where T = _getFs(Φ.N, Φ.points)
+_getFs(Φ::ContinuousZernike{T}) where T = _getFs(Φ.N, Φ.points)
 
-function ldiv(Φ::FiniteContinuousZernike{V}, f::AbstractQuasiVector) where V
-    @warn "Expanding via FiniteContinuousZernike is ill-conditioned, please use FiniteZernikeBasis."
+function ldiv(Φ::ContinuousZernike{V}, f::AbstractQuasiVector) where V
+    @warn "Expanding via ContinuousZernike is ill-conditioned, please use ZernikeBasis."
     Fs = Φ.Fs
     [Φ \ f.f.(axes(Φ, 1)) for Φ in Fs]
 end
@@ -127,9 +128,12 @@ end
 # L2 inner products
 # Gives out list of mass matrices of correct size
 ###
-@simplify function *(A::QuasiAdjoint{<:Any,<:FiniteContinuousZernike}, B::FiniteContinuousZernike)
+@simplify function *(A::QuasiAdjoint{<:Any,<:ContinuousZernike}, B::ContinuousZernike)
     @assert A' == B
-    Fs = B.Fs
+    mass_matrix(B)
+end
+function mass_matrix(A::ContinuousZernike)
+    Fs = A.Fs
     mass_matrix.(Fs)
 end
 
@@ -137,7 +141,7 @@ end
 # Weighted L2 inner products
 # Gives out list of the assembly matrices of correct size
 ###
-@simplify function *(A::QuasiAdjoint{<:Any,<:FiniteContinuousZernike}, λB::BroadcastQuasiMatrix{<:Any, typeof(*), <:Tuple{BroadcastQuasiVector, FiniteContinuousZernike}})
+@simplify function *(A::QuasiAdjoint{<:Any,<:ContinuousZernike}, λB::BroadcastQuasiMatrix{<:Any, typeof(*), <:Tuple{BroadcastQuasiVector, ContinuousZernike}})
     λ, B = λB.args
     @assert A' == B
     Fs = B.Fs
@@ -170,7 +174,7 @@ end
     [assembly_matrix(F, Λ) for (F, Λ) in zip(Fs, Λs)]
 end
 
-function piecewise_constant_assembly_matrix(Φ::FiniteContinuousZernike, λ::Function)
+function piecewise_constant_assembly_matrix(Φ::ContinuousZernike, λ::Function)
     Fs = Φ.Fs
     K, points = lastindex(Φ.points)-1, Φ.points
     λs = λ.((points[1:end-1] + points[2:end] ) / 2)
@@ -182,43 +186,47 @@ end
 # Gradient for constructing weak Laplacian.
 ###
 
-struct GradientFiniteContinuousZernike{T}<:Basis{T}
-    Φ::FiniteContinuousZernike{T}
+struct GradientContinuousZernike{T}<:Basis{T}
+    Φ::ContinuousZernike{T}
 end
 
-# GradientFiniteContinuousZernike{T}(N::Int, points::AbstractVector) where {T} =  GradientFiniteContinuousZernike{T,Int, typeof(points)}(N, points)
-# GradientFiniteContinuousZernike(N::Int, points::AbstractVector) =  GradientFiniteContinuousZernike{Float64}(N, points)
+# GradientContinuousZernike{T}(N::Int, points::AbstractVector) where {T} =  GradientContinuousZernike{T,Int, typeof(points)}(N, points)
+# GradientContinuousZernike(N::Int, points::AbstractVector) =  GradientContinuousZernike{Float64}(N, points)
 
-axes(Z:: GradientFiniteContinuousZernike) = (Inclusion(last(Z.Φ.points)*UnitDisk{eltype(Z)}()), oneto(Z.Φ.N*(length(Z.Φ.points)-1)-(length(Z.Φ.points)-2)))
-==(P::GradientFiniteContinuousZernike, Q::GradientFiniteContinuousZernike) = P.Φ.points == Q.Φ.points
+axes(Z:: GradientContinuousZernike) = (Inclusion(last(Z.Φ.points)*UnitDisk{eltype(Z)}()), oneto(Z.Φ.N*(length(Z.Φ.points)-1)-(length(Z.Φ.points)-2)))
+==(P::GradientContinuousZernike, Q::GradientContinuousZernike) = P.Φ.points == Q.Φ.points
 
-@simplify function *(D::Derivative, Φ::FiniteContinuousZernike)
-    GradientFiniteContinuousZernike(Φ)
+@simplify function *(D::Derivative, Φ::ContinuousZernike)
+    GradientContinuousZernike(Φ)
 end
 
-@simplify function *(A::QuasiAdjoint{<:Any,<:GradientFiniteContinuousZernike}, B::GradientFiniteContinuousZernike)
+@simplify function *(A::QuasiAdjoint{<:Any,<:GradientContinuousZernike}, B::GradientContinuousZernike)
     T = promote_type(eltype(A), eltype(B))
     @assert A' == B
     # points = T.(B.Φ.points);
     # N = B.Φ.N;
+    stiffness_matrix(B)
+end
+function stiffness_matrix(B::GradientContinuousZernike)
     Fs = B.Φ.Fs
     stiffness_matrix.(Fs)
 end
 
-# function zero_dirichlet_bcs!(Φ::FiniteContinuousZernike{T}, Δ::AbstractVector{<:LinearAlgebra.Symmetric{T,<:BBBArrowheadMatrix{T}}}) where T
+
+# function zero_dirichlet_bcs!(Φ::ContinuousZernike{T}, Δ::AbstractVector{<:LinearAlgebra.Symmetric{T,<:BBBArrowheadMatrix{T}}}) where T
 #     @assert length(Δ) == 2*Φ.N-1
 #     Fs = _getFs(Φ.N, Φ.points)
 #     zero_dirichlet_bcs!.(Fs, Δ)
 # end
 
-function zero_dirichlet_bcs!(Φ::FiniteContinuousZernike{T}, Δ::AbstractVector{<:AbstractMatrix}) where T
+function zero_dirichlet_bcs!(Φ::ContinuousZernike{T}, Δ::AbstractVector{<:AbstractMatrix}) where T
     @assert length(Δ) == 2*Φ.N-1
     # @assert Δ[1] isa LinearAlgebra.Symmetric{T, <:BBBArrowheadMatrix{T}}
     Fs = Φ.Fs #_getFs(Φ.N, Φ.points)
     zero_dirichlet_bcs!.(Fs, Δ)
 end
 
-function zero_dirichlet_bcs!(Φ::FiniteContinuousZernike{T}, Mf::AbstractVector{<:PseudoBlockVector}) where T
+function zero_dirichlet_bcs!(Φ::ContinuousZernike{T}, Mf::AbstractVector{<:PseudoBlockVector}) where T
     @assert length(Mf) == 2*Φ.N-1
     Fs = Φ.Fs #_getFs(Φ.N, Φ.points)
     zero_dirichlet_bcs!.(Fs, Mf)
@@ -252,7 +260,7 @@ end
 # This helper function takes the list of coefficient values from ldiv and converts them into 
 # a 3-tensor of degree × Fourier mode × element. Us is the hat/bubble coeffiecients
 # and Ũs are the corresponding ZernikeAnnulus(ρ,1,1) coefficients.
-function _bubble2disk_or_ann_all_modes(Φ::FiniteContinuousZernike, us::AbstractVector)
+function _bubble2disk_or_ann_all_modes(Φ::ContinuousZernike, us::AbstractVector)
     T = eltype(Φ)
     points = T.(Φ.points); K = length(points)-1
     N = Int((length(us)+1)/2)
@@ -291,7 +299,7 @@ function _bubble2disk_or_ann_all_modes(Φ::FiniteContinuousZernike, us::Abstract
             end
         else
             for (Fm, i) in zip(Fs, 1:2N-1)
-                C = _getCs(Fm)[k]
+                C = Fm.Cs[k] #_getCs(Fm)[k]
                 Ũs[1:Ms[i],i,k] = bubble2ann(C, Us[1:Ms[i],i,k])
             end
         end
@@ -300,7 +308,7 @@ function _bubble2disk_or_ann_all_modes(Φ::FiniteContinuousZernike, us::Abstract
 end
 
 
-function finite_plotvalues(Φ::FiniteContinuousZernike, us::AbstractVector; N=0, K=0)
+function finite_plotvalues(Φ::ContinuousZernike, us::AbstractVector; N=0, K=0)
     T = eltype(Φ)
     _, Ũs = _bubble2disk_or_ann_all_modes(Φ, us)
     points = T.(Φ.points)
@@ -341,7 +349,7 @@ function _inf_error(K::Int, θs::AbstractVector, rs::AbstractVector, vals::Abstr
     vals_, norm((norm.(vals_, Inf)), Inf)
 end
 
-function inf_error(Φ::FiniteContinuousZernike{T}, θs::AbstractVector, rs::AbstractVector, vals::AbstractVector, u::Function;K=0) where T
+function inf_error(Φ::ContinuousZernike{T}, θs::AbstractVector, rs::AbstractVector, vals::AbstractVector, u::Function;K=0) where T
     K = K==0 ? lastindex(Φ.points)-1 : K
     _inf_error(K, θs, rs, vals, u)
 end
