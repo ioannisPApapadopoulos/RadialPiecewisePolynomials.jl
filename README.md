@@ -26,8 +26,6 @@ ContinuousZernike at degree N=10 and endpoints [0.0, 0.49999999999999994, 0.6299
 
 julia> Ψ = ZernikeBasis(10, points, 0, 0); # L² conforming disk FEM basis up to degree 10
 
-julia> x,y = first.(axes(Ψ,1)), last.(axes(Ψ,1));
-
 julia> f = Ψ \ (xy -> sin(first(xy))+last(xy)).(xy); # Expand sin(x+y)
 
 julia> M = Φ' * Φ; # mass matrix
