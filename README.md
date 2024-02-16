@@ -34,6 +34,6 @@ julia> D = Derivative(axes(Φ,1)); A = (D*Φ)' * (D*Φ); # stiffness matrix
 
 julia> b = (Φ' * Ψ) .* f; # load vector
 
-julia> u = Matrix.(A .+ M) .\ b; # Solve (-Δ + I)u = f.
+julia> u = Matrix.(A .+ M) .\ b; # Solve (-Δ + I)u = f with zero Nuemann bcs
 
 ```
