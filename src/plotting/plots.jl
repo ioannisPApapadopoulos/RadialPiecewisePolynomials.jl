@@ -38,17 +38,17 @@ function _plot(K::Int, θs::AbstractVector, rs::AbstractVector, vals::AbstractVe
     display(gcf())
 end
 
-function plot(F::FiniteContinuousZernike{T}, θs::AbstractVector, rs::AbstractVector, vals::AbstractVector;ρ::T=0.0, ttl=[], vminmax=[],K=0) where T
+function plot(F::ContinuousZernike{T}, θs::AbstractVector, rs::AbstractVector, vals::AbstractVector;ρ::T=0.0, ttl=[], vminmax=[],K=0) where T
     K = K ==0 ? lastindex(F.points)-1 : K
     _plot(K, θs, rs, vals, ρ=ρ, ttl=ttl, vminmax=vminmax)
 end
 
-function plot(F::FiniteContinuousZernikeMode{T}, θs::AbstractVector, rs::AbstractVector, vals::AbstractVector;ρ::T=0.0, ttl=[], K=0) where T
+function plot(F::ContinuousZernikeMode{T}, θs::AbstractVector, rs::AbstractVector, vals::AbstractVector;ρ::T=0.0, ttl=[], K=0) where T
     K = K ==0 ? lastindex(Z.points)-1 : K
     _plot(K, θs, rs, vals, ρ=ρ, ttl=ttl)
 end
 
-function plot(Z::FiniteZernikeBasis{T}, θs::AbstractVector, rs::AbstractVector, vals::AbstractVector;ρ::T=0.0, ttl=[], K=0) where T
+function plot(Z::ZernikeBasis{T}, θs::AbstractVector, rs::AbstractVector, vals::AbstractVector;ρ::T=0.0, ttl=[], K=0) where T
     K = K ==0 ? lastindex(Z.points)-1 : K
     _plot(K, θs, rs, vals, ρ=ρ, ttl=ttl)
 end

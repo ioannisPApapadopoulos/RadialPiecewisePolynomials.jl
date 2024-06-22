@@ -1,7 +1,7 @@
 name = "RadialPiecewisePolynomials"
 uuid = "7dab568b-3cf7-4f91-a977-b4631dfca174"
 authors = ["john.papad "]
-version = "0.1.1"
+version = "0.1.2"
 
 [deps]
 AnnuliOrthogonalPolynomials = "de1797fd-24c3-4035-91a2-b52aecdcfb01"
@@ -21,11 +21,12 @@ MultivariateOrthogonalPolynomials = "4f6956fd-4f93-5457-9149-7bfc4b2ce06d"
 PiecewiseOrthogonalPolynomials = "4461d12d-4663-4550-8580-cb764c85e20f"
 QuasiArrays = "c4ea9172-b204-11e9-377d-29865faadc5c"
 SemiclassicalOrthogonalPolynomials = "291c01f3-23f6-4eb6-aeb0-063a639b53f2"
+SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 SpecialFunctions = "276daf66-3868-5448-9aa4-cd146d93841b"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 
 [compat]
-AnnuliOrthogonalPolynomials = "0.0.4"
+AnnuliOrthogonalPolynomials = "0.0.5"
 BandedMatrices = "0.17, 1"
 BlockArrays = "0.16"
 BlockBandedMatrices = "0.12"

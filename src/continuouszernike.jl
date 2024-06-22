@@ -232,6 +232,12 @@ function zero_dirichlet_bcs!(Φ::ContinuousZernike{T}, Mf::AbstractVector{<:Pseu
     zero_dirichlet_bcs!.(Fs, Mf)
 end
 
+function zero_dirichlet_bcs!(Φ::ContinuousZernike{T}, Mf::AbstractVector{<:AbstractVector}) where T
+    @assert length(Mf) == 2*Φ.N-1
+    Fs = Φ.Fs #_getFs(Φ.N, Φ.points)
+    zero_dirichlet_bcs!.(Fs, Mf)
+end
+
 function zero_dirichlet_bcs!(points::AbstractVector{T}, A::Matrix) where T
     K = length(points)-1
     if first(points) > 0

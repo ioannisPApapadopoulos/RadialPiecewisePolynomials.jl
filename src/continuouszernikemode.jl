@@ -372,7 +372,31 @@ function zero_dirichlet_bcs!(F::ContinuousZernikeMode{T}, A::Matrix) where T
     end
 end
 
+function zero_dirichlet_bcs!(F::ContinuousZernikeMode{T}, A::SparseMatrixCSC) where T
+    points = F.points
+    K = length(points)-1
+    if first(points) > 0
+        A[1,:] .= zero(T); A[:,1] .= zero(T)
+        A[K+1, :] .= zero(T); A[:, K+1] .= zero(T)
+        A[1,1] = one(T); A[K+1, K+1] = one(T)
+    else
+        A[K,:] .= zero(T); A[:,K] .= zero(T)
+        A[K,K] = one(T)
+    end
+end
+
 function zero_dirichlet_bcs!(F::ContinuousZernikeMode{T}, Mf::PseudoBlockVector) where T
+    points = F.points
+    K = length(points)-1
+    if !(first(points) ≈  0)
+        Mf[1] = zero(T)
+        Mf[K+1] = zero(T)
+    else
+        Mf[K] = zero(T)
+    end
+end
+
+function zero_dirichlet_bcs!(F::ContinuousZernikeMode{T}, Mf::AbstractVector) where T
     points = F.points
     K = length(points)-1
     if !(first(points) ≈  0)
