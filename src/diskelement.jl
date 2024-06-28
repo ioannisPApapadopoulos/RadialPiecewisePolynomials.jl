@@ -134,7 +134,9 @@ function assembly_matrix(C::ContinuousZernikeElementMode, Λ::AbstractMatrix)
     R₁₁ = ρ / sqrt(2*one(T)) * (Weighted(Normalized(Jacobi{T}(0,m))) \ Weighted(Normalized(Jacobi{T}(1,m))))
     R = Hcat(Vcat(ρ*one(T), Zeros{T}(∞)), R₁₁)
 
-    ApplyArray(*, R', ApplyArray(*, Λ, R))
+    # BUG in Julia 1.10 means R' * Λ fails to print with a checkbounds error
+    Rt = Bidiagonal(view(R, band(0)), view(R, band(1)), :L)
+    ApplyArray(*, Rt, ApplyArray(*, Λ, R))
 end
 
 ###

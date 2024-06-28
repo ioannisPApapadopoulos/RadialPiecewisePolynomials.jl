@@ -385,7 +385,7 @@ function zero_dirichlet_bcs!(F::ContinuousZernikeMode{T}, A::SparseMatrixCSC) wh
     end
 end
 
-function zero_dirichlet_bcs!(F::ContinuousZernikeMode{T}, Mf::PseudoBlockVector) where T
+function zero_dirichlet_bcs!(F::ContinuousZernikeMode{T}, Mf::BlockVector) where T
     points = F.points
     K = length(points)-1
     if !(first(points) ≈  0)
