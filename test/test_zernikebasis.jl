@@ -8,9 +8,9 @@ f6(xy) = exp(-first(xy)^2-last(xy)^2) * sqrt(first(xy)^2+last(xy)^2)^6*cos(6*ata
 f1c(xy) = exp(-first(xy)^2-last(xy)^2) * sqrt(first(xy)^2+last(xy)^2)*cos(atan(last(xy), first(xy)))
 f1s(xy) = exp(-first(xy)^2-last(xy)^2) * sqrt(first(xy)^2+last(xy)^2)*sin(atan(last(xy), first(xy)))
 
-c1 = -10; c2 = 0; c3=0.6
 function u0_(x, y)
     ρ = 0.2
+    c1, c3 = -10, 0.6
     exp(c1*(x^2 + (y-c3)^2)) * (1-(x^2+y^2)) * ((x^2+y^2)-ρ^2)
 end
 function u0(xy)

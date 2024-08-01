@@ -1,9 +1,9 @@
 using Test, RadialPiecewisePolynomials, Memoization
 import RadialPiecewisePolynomials: _getγs
 
-c1 = -10; c2 = 0; c3=0.6
 function f0_(x, y)
     ρ = 0.2
+    c1,c3 = -10, 0.6
     exp(c1*(x^2 + (y-c3)^2)) * (1-(x^2+y^2)) * ((x^2+y^2)-ρ^2)
 end
 function f0(xy)

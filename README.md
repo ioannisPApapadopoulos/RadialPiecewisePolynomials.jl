@@ -1,7 +1,7 @@
 # RadialPiecewisePolynomials.jl
 
 [![CI](https://github.com/ioannisPApapadopoulos/RadialPiecewisePolynomials.jl/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/ioannisPApapadopoulos/RadialPiecewisePolynomials.jl/actions/workflows/ci.yml)
-[![codecov.io](http://codecov.io/github/ioannisPApapadopoulos/RadialPiecewisePolynomials.jl/coverage.svg?branch=main)](http://codecov.io/github/ioannisPApapadopoulos/RadialPiecewisePolynomials.jl?branch=main)
+[![codecov.io](http://codecov.io/gh/ioannisPApapadopoulos/RadialPiecewisePolynomials.jl/branch/main/graph/badge.svg)](http://codecov.io/github/ioannisPApapadopoulos/RadialPiecewisePolynomials.jl?branch=main)
 
 A Julia package for a hierarchical hp-finite element basis on disk and annuli. The mesh is an innermost disk (omitted if the domain is an annulus) and concentric annuli. The basis consists of Zernike (annular) polynomials modified into hat (external shape) and bubble (internal shape) functions.
 
