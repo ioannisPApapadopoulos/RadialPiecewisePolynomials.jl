@@ -1,7 +1,7 @@
 name = "RadialPiecewisePolynomials"
 uuid = "7dab568b-3cf7-4f91-a977-b4631dfca174"
 authors = ["john.papad "]
-version = "0.1.3"
+version = "0.1.4"
 
 [deps]
 AnnuliOrthogonalPolynomials = "de1797fd-24c3-4035-91a2-b52aecdcfb01"
