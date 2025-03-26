@@ -193,7 +193,7 @@ function mass_matrix(C::ContinuousZernikeAnnulusElementMode)
 
     m₀ = _mass_m₀(C, m, t)
     # TODO fix the excess zeros
-    return ApplyArray(*,Diagonal(Fill(β^2*m₀,∞)), ApplyArray(*, C.R', C.R))
+    return ApplyArray(*,Diagonal(Fill(β^2*m₀,size(C.R,1))), ApplyArray(*, C.R', C.R))
 end
 
 
@@ -309,8 +309,8 @@ function stiffness_matrix(C::ContinuousZernikeAnnulusElementMode)
         C = [W010(m, ρ) W_100_010(m, ρ) 4*m₀*(m+1); W_100_010(m, ρ) W100(m,ρ) -4*m₀*(m+1)]
     end
 
-    Δ = [[C[1:2,3]'; Zeros{T}(∞,2)] Δ]
-    Vcat(Hcat(C, Zeros{T}(2,∞)), Δ)
+    Δ = [[C[1:2,3]'; Zeros{T}(size(Δ,2)-1,2)] Δ]
+    Vcat(Hcat(C, Zeros{T}(2,size(Δ,2)-3)), Δ)
 end
 
 ###
