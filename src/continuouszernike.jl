@@ -104,7 +104,7 @@ function _getFs(N::Int, points::AbstractVector{T}) where T
     for (M, m, j) in zip(Ms, ms, js)
         # Extract the lowering and differentiation matrices associated
         # with each Fourier mode and store in the Tuples
-        R = NTuple{K+1-κ, Tridiagonal}([Tridiagonal(view(Rs[i][m+1],1:M, 1:M)) for i in 1:K+1-κ])
+        R = NTuple{K+1-κ, BandedMatrix}([BandedMatrix(view(Rs[i][m+1],1:M, 1:M), (1,2)) for i in 1:K+1-κ])
         D = NTuple{K+1-κ, Tridiagonal}([Tridiagonal(Ds[i][m+1][1:M, 1:M]) for i in 1:K+1-κ])
 
         normalize_constants = Vector{T}[T[cst[k][i][m+1] for k in 1:lastindex(cst)] for i in 1:K+1-κ]

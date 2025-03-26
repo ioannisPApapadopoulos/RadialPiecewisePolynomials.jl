@@ -147,12 +147,12 @@ function ldiv(C::ContinuousZernikeAnnulusElementMode{T}, f::AbstractQuasiVector)
     # Truncate machine error tail
     Ñ = findall(x->abs(x) > 2*eps(T), c̃)
     c̃ = isempty(Ñ) ? Zeros{T}(3) : c̃[1:Ñ[end]+min(5, length(c̃)-Ñ[end])]
-    N = length(c̃) # degree
+    N = min(length(c̃), size(C.R,1)) # degree
 
     R̃ = view(C.R, 1:N, 1:N)
 
     # convert from ZernikeAnnulus(ρ,w_a,w_a) to hats + Bubble
-    dat = R̃[1:N,1:N] \ c̃
+    dat = R̃[1:N,1:N] \ c̃[1:N]
     cfs = T[]
     pad(append!(cfs, dat), axes(C,2))
 end
@@ -210,7 +210,7 @@ end
     # We need to compute the Jacobi matrix multiplier addition due to the
     # variable Helmholtz coefficient λ(r²). We expand λ(r²) in chebyshevt
     # and then use Clenshaw to compute λ(β^2*(I-X/t)) where X is the 
-    # correponding Jacobi matrix for this basis.
+    # corresponding Jacobi matrix for this basis.
     Tn = chebyshevt(C.points[1]..C.points[2])
     u = Tn \ λ.f.(axes(Tn,1))
     X = jacobimatrix(SemiclassicalJacobi(t, 0, 0, m))
@@ -229,7 +229,8 @@ function assembly_matrix(C::ContinuousZernikeAnnulusElementMode, Λ::AbstractMat
     m₀ = _mass_m₀(C, m, t)
 
     # TODO fix the excess zeros
-    ApplyArray(*,Diagonal(Fill(β^2*m₀,∞)), ApplyArray(*, C.R', ApplyArray(*, Λ, C.R)))
+    sz = size(C.R)
+    ApplyArray(*,Diagonal(Fill(β^2*m₀,sz)), ApplyArray(*, C.R', ApplyArray(*, view(Λ,1:sz[1],1:sz[2]), C.R)))
 end
 
 
