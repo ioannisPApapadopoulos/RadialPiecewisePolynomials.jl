@@ -25,18 +25,18 @@ end
 
 # Matrices for lowering to ZernikeAnnulus(0,0) via
 # direct lowering. Less stable, but probably lower complexity.
-function _ann2element_via_raising(t::T) where T
+function _ann2element_via_raising_N(t::T, N::Int) where T
     # {T} did not change the speed.
-    Q₀₀ = SemiclassicalJacobi{T}.(t, 0, 0, 0:∞)
-    Q₀₁ = SemiclassicalJacobi{T}.(t, 0, 1, 0:∞)
-    Q₁₀ = SemiclassicalJacobi{T}.(t, 1, 0, 0:∞)
-    Q₁₁ = SemiclassicalJacobi{T}.(t, 1, 1, 0:∞)
+    Q₀₀ = SemiclassicalJacobi{T}.(t, 0, 0, 0:N)
+    Q₀₁ = SemiclassicalJacobi{T}.(t, 0, 1, 0:N)
+    Q₁₀ = SemiclassicalJacobi{T}.(t, 1, 0, 0:N)
+    Q₁₁ = SemiclassicalJacobi{T}.(t, 1, 1, 0:N)
 
     R₁₁ = (Weighted.(Q₀₀) .\ Weighted.(Q₁₁)) / t^2
     R₀₁ = BroadcastVector{AbstractVector}((Q, P) -> (Weighted(Q) \ Weighted(P))[1:2,1] / t, Q₀₀, Q₀₁)
     R₁₀ = BroadcastVector{AbstractVector}((Q, P) -> (Weighted(Q) \ Weighted(P))[1:2,1] / t, Q₀₀, Q₁₀)
 
-    BroadcastVector{AbstractMatrix}((R11, R01, R10)->Hcat(Vcat(R10, Zeros{T}(∞)), Vcat(R01, Zeros{T}(∞)), R11), R₁₁, R₀₁, R₁₀)
+    BroadcastVector{AbstractMatrix}((R11, R01, R10)->Hcat(Vcat(R10, Zeros{T}(size(R11,1)+1)), Vcat(R01, Zeros{T}(size(R11,2))), R11), R₁₁, R₀₁, R₁₀)
 end
 
 function _getMs_ms_js(N::Int)
@@ -78,7 +78,7 @@ function _getFs(N::Int, points::AbstractVector{T}) where T
         # intervals and Fourier modes simultaneously.
 
 
-        Rs = _ann2element_via_raising.(ts)
+        Rs = _ann2element_via_raising_N.(ts, N)
         cst = [[sum.(SemiclassicalJacobiWeight.(t,a,a,0:ms[end])) for t in ts] for a in 1:-1:0]
 
         # Use broadcast notation to compute all the derivative matrices across
@@ -104,13 +104,13 @@ function _getFs(N::Int, points::AbstractVector{T}) where T
     for (M, m, j) in zip(Ms, ms, js)
         # Extract the lowering and differentiation matrices associated
         # with each Fourier mode and store in the Tuples
-        R = NTuple{K+1-κ, AbstractMatrix}([Rs[i][m+1] for i in 1:K+1-κ])
-        D = NTuple{K+1-κ, AbstractMatrix}([Ds[i][m+1] for i in 1:K+1-κ])
+        R = NTuple{K+1-κ, BandedMatrix}([BandedMatrix(view(Rs[i][m+1],1:M, 1:M), (1,2)) for i in 1:K+1-κ])
+        D = NTuple{K+1-κ, Tridiagonal}([Tridiagonal(Ds[i][m+1][1:M, 1:M]) for i in 1:K+1-κ])
 
         normalize_constants = Vector{T}[T[cst[k][i][m+1] for k in 1:lastindex(cst)] for i in 1:K+1-κ]
         Cs = Tuple(_getCs(points, m, j, N, R, D, normalize_constants, same_ρs))
 
-        # Construct the structs for each Fourier mode seperately
+        # Construct the structs for each Fourier mode separately
         append!(Fs, [ContinuousZernikeMode(M, points, m, j, Cs, normalize_constants, same_ρs, N)])
     end
     return Fs

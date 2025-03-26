@@ -156,7 +156,7 @@ function gram_matrix(C::ContinuousZernikeAnnulusElementMode, Ψ::ZernikeBasisMod
 
     if a == 0 && b == 0
         m₀ = _mass_m₀(C,m,t)
-        ApplyArray(*,Diagonal(Fill(β^2*m₀,∞)), C.R')
+        ApplyArray(*,Diagonal(Fill(β^2*m₀,size(C.R))), C.R')
     else
         error("L²-inner product between ContinuousZernikeAnnulusElementMode and ZernikeBasisModeElement not implemented for parameters Ψ.a = $a and Ψ.b = $b")
     end
@@ -176,7 +176,7 @@ function gram_matrix(C::ContinuousZernikeElementMode, Ψ::ZernikeBasisModeElemen
 
     if a == 0 && b == 0
         R = Zernike(0) \ Weighted(Zernike(1))
-        Vcat(Hcat(β^2, Zeros{T}(1,∞)), β^2*R.ops[m+1]')
+        Vcat(Hcat(β^2, Zeros{T}(1,size(R.ops[m+1],2))), β^2*R.ops[m+1]')
     else
         error("L²-inner product between ContinuousZernikeElementMode and ZernikeBasisModeElement not implemented for parameters Ψ.a = $a and Ψ.b = $b")
     end
