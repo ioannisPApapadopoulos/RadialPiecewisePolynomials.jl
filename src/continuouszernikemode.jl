@@ -239,10 +239,10 @@ function mass_matrix(B::ContinuousZernikeMode)
         if first(B.points) ≈ 0
             Md = mass_matrix(Cs[1])
             M = mass_matrix(Cs[2])
-            Ms = append!(Any[Md], [ApplyArray(*,Diagonal(Fill((B.points[k]/B.points[3])^2 ,∞)),M) for k = 3:length(B.points)])
+            Ms = append!(Any[Md], [ApplyArray(*,Diagonal(Fill((B.points[k]/B.points[3])^2 , size(M))),M) for k = 3:length(B.points)])
         else
             M = mass_matrix(Cs[1])
-            Ms = [ApplyArray(*,Diagonal(Fill((B.points[k]/B.points[2])^2 ,∞)),M) for k = 2:length(B.points)]
+            Ms = [ApplyArray(*,Diagonal(Fill((B.points[k]/B.points[2])^2 ,size(M))),M) for k = 2:length(B.points)]
         end
     else
         Ms = mass_matrix.(Cs)
