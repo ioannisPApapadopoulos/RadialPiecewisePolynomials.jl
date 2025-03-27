@@ -1,6 +1,6 @@
 module RadialPiecewisePolynomials
 
-using AnnuliOrthogonalPolynomials, BandedMatrices, BlockArrays, BlockBandedMatrices, ClassicalOrthogonalPolynomials, ContinuumArrays, DomainSets,
+using AnnuliOrthogonalPolynomials, BandedMatrices, BlockArrays, BlockBandedMatrices, BlockDiagonals, ClassicalOrthogonalPolynomials, ContinuumArrays, DomainSets,
     FastTransforms, LinearAlgebra, MultivariateOrthogonalPolynomials, SemiclassicalOrthogonalPolynomials,
     StaticArrays, QuasiArrays, FillArrays, LazyArrays, Memoization, SparseArrays, MatrixFactorizations#, ArrayLayouts#, LazyBandedMatrices#,
 
