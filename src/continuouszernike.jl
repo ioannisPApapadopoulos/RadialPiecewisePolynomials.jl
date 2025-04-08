@@ -207,8 +207,8 @@ end
     # N = B.Φ.N;
     stiffness_matrix(B)
 end
-function stiffness_matrix(B::GradientContinuousZernike)
-    Fs = B.Φ.Fs
+function stiffness_matrix(Φ::ContinuousZernike)
+    Fs = Φ.Fs
     stiffness_matrix.(Fs)
 end
 
