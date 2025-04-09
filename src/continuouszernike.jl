@@ -205,7 +205,7 @@ end
     @assert A' == B
     # points = T.(B.Φ.points);
     # N = B.Φ.N;
-    stiffness_matrix(B)
+    stiffness_matrix(B.Φ)
 end
 function stiffness_matrix(Φ::ContinuousZernike)
     Fs = Φ.Fs
